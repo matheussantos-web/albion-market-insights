@@ -14,27 +14,23 @@ Router.register('/', async (app) => {
     ];
 
     app.innerHTML = `
-      <div class="carousel-wrap">
-        <div class="carousel-ad-left">Publicidade</div>
-        <div class="carousel" id="carousel">
-          <div class="carousel-track" id="carouselTrack">
-            ${SLIDES.map((s, i) => `
-              <div class="carousel-slide">
-                <div class="carousel-slide-content">
-                  ${s.title ? `<h2>${s.title}</h2>` : ''}
-                  ${s.subtitle ? `<p>${s.subtitle}</p>` : ''}
-                  ${s.cta ? `<a href="${s.cta.href}" class="btn btn-gold" style="margin-top:0.8rem">${s.cta.label}</a>` : ''}
-                </div>
+      <div class="carousel" id="carousel" style="margin:0 1.5rem">
+        <div class="carousel-track" id="carouselTrack">
+          ${SLIDES.map((s, i) => `
+            <div class="carousel-slide">
+              <div class="carousel-slide-content">
+                ${s.title ? `<h2>${s.title}</h2>` : ''}
+                ${s.subtitle ? `<p>${s.subtitle}</p>` : ''}
+                ${s.cta ? `<a href="${s.cta.href}" class="btn btn-gold" style="margin-top:0.8rem">${s.cta.label}</a>` : ''}
               </div>
-            `).join('')}
-          </div>
-          <button class="carousel-btn carousel-prev" id="carouselPrev">‹</button>
-          <button class="carousel-btn carousel-next" id="carouselNext">›</button>
-          <div class="carousel-dots" id="carouselDots">
-            ${SLIDES.map((_, i) => `<span class="carousel-dot${i === 0 ? ' active' : ''}" data-slide="${i}"></span>`).join('')}
-          </div>
+            </div>
+          `).join('')}
         </div>
-        <div class="carousel-ad-right">Publicidade</div>
+        <button class="carousel-btn carousel-prev" id="carouselPrev">‹</button>
+        <button class="carousel-btn carousel-next" id="carouselNext">›</button>
+        <div class="carousel-dots" id="carouselDots">
+          ${SLIDES.map((_, i) => `<span class="carousel-dot${i === 0 ? ' active' : ''}" data-slide="${i}"></span>`).join('')}
+        </div>
       </div>
 
       <div style="max-width:1200px;margin:0 auto;padding:0 1.5rem">
