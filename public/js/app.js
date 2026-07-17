@@ -2,6 +2,8 @@ let chartInstance = null;
 let currentItemId = null;
 let searchTimeout = null;
 let activeTier = '';
+let activeCategory = '';
+let categories = [];
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -9,14 +11,66 @@ const searchInput = $('#searchInput');
 const searchResults = $('#searchResults');
 const tierFilter = $('#tierFilter');
 const syncBtn = $('#syncBtn');
+const categoryList = $('#categoryList');
+const categoryCount = $('#categoryCount');
+const categorySearch = $('#categorySearch');
+const cityFilter = $('#cityFilter');
+const sourceFilter = $('#sourceFilter');
 
 syncBtn.addEventListener('click', handleSync);
 tierFilter.addEventListener('click', handleTierFilter);
 searchInput.addEventListener('input', handleSearchInput);
 searchInput.addEventListener('keydown', handleSearchKeydown);
+categorySearch.addEventListener('input', handleCategorySearch);
+cityFilter.addEventListener('change', handleFilterChange);
+sourceFilter.addEventListener('change', handleFilterChange);
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.search-box')) searchResults.classList.remove('active');
 });
+
+loadCategories();
+
+async function loadCategories() {
+  try {
+    categories = await getCategories();
+    categoryCount.textContent = `${categories.length} categorias`;
+    renderCategories('');
+  } catch (e) {
+    categoryList.innerHTML = '<div class="loading-small">Erro ao carregar</div>';
+  }
+}
+
+function handleCategorySearch() {
+  renderCategories(categorySearch.value.trim().toLowerCase());
+}
+
+function renderCategories(filter) {
+  const allItemsCount = categories.reduce((s, c) => s + c.count, 0);
+  const filtered = filter
+    ? categories.filter((c) => c.category.toLowerCase().includes(filter))
+    : categories;
+
+  let html = `<div class="category-item all-items${activeCategory === '' ? ' active' : ''}" data-cat="">
+    <span>Todos os itens</span>
+    <span class="cat-count">${allItemsCount}</span>
+  </div>`;
+
+  html += filtered.map((c) => `
+    <div class="category-item${activeCategory === c.category ? ' active' : ''}" data-cat="${c.category}">
+      <span>${c.category}</span>
+      <span class="cat-count">${c.count}</span>
+    </div>
+  `).join('');
+
+  categoryList.innerHTML = html;
+  categoryList.querySelectorAll('.category-item').forEach((el) => {
+    el.addEventListener('click', () => {
+      activeCategory = el.dataset.cat;
+      renderCategories(categorySearch.value.trim().toLowerCase());
+      if (searchInput.value.trim()) doSearch(searchInput.value.trim());
+    });
+  });
+}
 
 async function handleSync() {
   syncBtn.disabled = true;
@@ -51,6 +105,10 @@ function handleTierFilter(e) {
   if (searchInput.value.trim()) doSearch(searchInput.value.trim());
 }
 
+function handleFilterChange() {
+  if (currentItemId) selectItem(currentItemId);
+}
+
 function handleSearchInput() {
   clearTimeout(searchTimeout);
   const q = searchInput.value.trim();
@@ -79,18 +137,19 @@ function handleSearchKeydown(e) {
 
 async function doSearch(q) {
   try {
-    const items = await searchItems(q, activeTier);
+    const items = await searchItems(q, activeTier, activeCategory);
     if (!items.length) {
       searchResults.innerHTML = '<div class="item" style="cursor:default;color:var(--text-dim)">Nenhum encontrado</div>';
       searchResults.classList.add('active');
       return;
     }
-    searchResults.innerHTML = items.slice(0, 30).map((it) => `
+    searchResults.innerHTML = items.slice(0, 40).map((it) => `
       <div class="item" data-id="${it.unique_name}">
-        <span>${it.name_ptbr || it.unique_name}</span>
-        <span>
-          <span class="tier">T${it.tier || '?'}</span>
-          ${it.enchantment > 0 ? `<span class="enchant">@${it.enchantment}</span>` : ''}
+        <span class="item-name">${it.name_ptbr || it.unique_name}</span>
+        <span class="item-meta">
+          <span class="category-badge-sm">${it.category || ''}</span>
+          <span class="tier-badge-sm">T${it.tier || '?'}</span>
+          ${it.enchantment > 0 ? `<span class="enchant-badge-sm">@${it.enchantment}</span>` : ''}
         </span>
       </div>
     `).join('');
@@ -154,7 +213,7 @@ function showLoading(on, msg) {
 }
 
 function timeAgo(dateStr) {
-  if (!dateStr) return '\u2014';
+  if (!dateStr) return '—';
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return 'agora';
@@ -166,7 +225,7 @@ function timeAgo(dateStr) {
 }
 
 function fmt(n) {
-  if (n == null) return '\u2014';
+  if (n == null) return '—';
   return n.toLocaleString('pt-BR');
 }
 
@@ -186,12 +245,22 @@ function renderLatest(itemId, rows) {
 
   const item = rows[0];
   const displayName = item.name_ptbr || itemId;
+
+  const cityFilterVal = cityFilter.value;
+  const sourceFilterVal = sourceFilter.value;
+  let filtered = rows;
+  if (cityFilterVal) filtered = filtered.filter((r) => r.city === cityFilterVal);
+  if (sourceFilterVal) filtered = filtered.filter((r) => r.source === sourceFilterVal);
+
   content.innerHTML = `
     <div class="selected-item-header">
       <span class="name">${displayName}</span>
       <span class="uname">${itemId}</span>
       ${item.tier ? `<span class="tier-badge">T${item.tier}</span>` : ''}
+      ${item.enchantment ? `<span class="enchant-badge">@${item.enchantment}</span>` : ''}
+      ${item.category ? `<span class="cat-badge">${item.category}</span>` : ''}
     </div>
+    ${filtered.length ? `
     <table class="price-table">
       <thead>
         <tr>
@@ -205,7 +274,7 @@ function renderLatest(itemId, rows) {
         </tr>
       </thead>
       <tbody>
-        ${rows.map((r) => `
+        ${filtered.map((r) => `
           <tr>
             <td class="city-name">${r.city}</td>
             <td class="price">${fmt(r.sell_price_min)}</td>
@@ -218,6 +287,7 @@ function renderLatest(itemId, rows) {
         `).join('')}
       </tbody>
     </table>
+    ` : '<p style="color:var(--text-dim);font-size:0.8rem;text-align:center;padding:1rem">Nenhum dado para os filtros selecionados</p>'}
   `;
 }
 

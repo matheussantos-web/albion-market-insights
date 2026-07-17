@@ -9,52 +9,87 @@
 </head>
 <body>
   <header>
-    <div>
+    <div class="header-brand">
       <h1>Albion Market Insights</h1>
       <div class="subtitle">Dashboard privado de análise de mercado</div>
     </div>
     <div class="search-box">
-      <input type="text" id="searchInput" placeholder="Buscar item (ex: capuz, espada, poção...)" autocomplete="off" />
+      <input type="text" id="searchInput" placeholder="Buscar item..." autocomplete="off" />
       <div class="search-results" id="searchResults"></div>
     </div>
-    <div class="tier-filter" id="tierFilter">
-      <button data-tier="">T</button>
-      <button data-tier="3">T3</button>
-      <button data-tier="4">T4</button>
-      <button data-tier="5">T5</button>
-      <button data-tier="6">T6</button>
-      <button data-tier="7">T7</button>
-      <button data-tier="8">T8</button>
+    <div class="header-filters">
+      <select id="cityFilter">
+        <option value="">Todas as cidades</option>
+        <option value="Caerleon">Caerleon</option>
+        <option value="Bridgewatch">Bridgewatch</option>
+        <option value="Lymhurst">Lymhurst</option>
+        <option value="Martlock">Martlock</option>
+        <option value="Fort Sterling">Fort Sterling</option>
+        <option value="Thetford">Thetford</option>
+        <option value="Black Market">Black Market</option>
+      </select>
+      <select id="sourceFilter">
+        <option value="">Todas as fontes</option>
+        <option value="private">Privado</option>
+        <option value="public_adp">AODP</option>
+      </select>
     </div>
     <button id="syncBtn" class="sync-btn" title="Sincronizar watchlist com AODP">Sync AODP</button>
   </header>
 
-  <div class="main" id="mainContent">
-    <div class="panel" id="latestPanel">
-      <h2>Preços Atuais</h2>
-      <div class="empty-state" id="latestEmpty">
-        <div class="icon">&#9876;</div>
-        <p>Selecione um item para ver os preços por cidade</p>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h2>Categorias</h2>
+        <span class="category-count" id="categoryCount"></span>
       </div>
-      <div id="latestContent" style="display:none"></div>
-    </div>
+      <div class="sidebar-search">
+        <input type="text" id="categorySearch" placeholder="Filtrar categoria..." />
+      </div>
+      <div class="category-list" id="categoryList">
+        <div class="loading-small">Carregando...</div>
+      </div>
+    </aside>
 
-    <div class="panel" id="statsPanel">
-      <h2>Estatísticas</h2>
-      <div class="empty-state" id="statsEmpty">
-        <div class="icon">&#9733;</div>
-        <p>Estatísticas aparecem aqui ao selecionar um item</p>
+    <div class="main">
+      <div class="tier-filter" id="tierFilter">
+        <button data-tier="">Todos</button>
+        <button data-tier="3">T3</button>
+        <button data-tier="4">T4</button>
+        <button data-tier="5">T5</button>
+        <button data-tier="6">T6</button>
+        <button data-tier="7">T7</button>
+        <button data-tier="8">T8</button>
       </div>
-      <div id="statsContent" style="display:none"></div>
-    </div>
 
-    <div class="panel history-panel" id="historyPanel">
-      <h2>Histórico de Preços</h2>
-      <div class="empty-state" id="historyEmpty">
-        <div class="icon">&#9783;</div>
-        <p>Gráfico do histórico de preços será exibido aqui</p>
+      <div class="panels">
+        <div class="panel" id="latestPanel">
+          <h2>Preços Atuais</h2>
+          <div class="empty-state" id="latestEmpty">
+            <div class="icon">⚔</div>
+            <p>Selecione um item para ver os preços por cidade</p>
+          </div>
+          <div id="latestContent" style="display:none"></div>
+        </div>
+
+        <div class="panel" id="statsPanel">
+          <h2>Estatísticas</h2>
+          <div class="empty-state" id="statsEmpty">
+            <div class="icon">★</div>
+            <p>Estatísticas aparecem aqui ao selecionar um item</p>
+          </div>
+          <div id="statsContent" style="display:none"></div>
+        </div>
+
+        <div class="panel history-panel" id="historyPanel">
+          <h2>Histórico de Preços</h2>
+          <div class="empty-state" id="historyEmpty">
+            <div class="icon">❦</div>
+            <p>Gráfico do histórico de preços será exibido aqui</p>
+          </div>
+          <div id="historyContent" style="display:none"></div>
+        </div>
       </div>
-      <div id="historyContent" style="display:none"></div>
     </div>
   </div>
 

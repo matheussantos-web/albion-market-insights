@@ -12,10 +12,15 @@ async function apiPost(path) {
   return res.json();
 }
 
-async function searchItems(query, tier) {
+async function searchItems(query, tier, category) {
   let url = `/api/items?search=${encodeURIComponent(query)}`;
   if (tier) url += `&tier=${tier}`;
+  if (category) url += `&category=${encodeURIComponent(category)}`;
   return apiGet(url);
+}
+
+async function getCategories() {
+  return apiGet('/api/items/categories');
 }
 
 async function getLatestPrices(itemId) {
