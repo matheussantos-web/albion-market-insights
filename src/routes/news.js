@@ -6,32 +6,46 @@ let cachedNews = null;
 let cacheTime = 0;
 const CACHE_TTL = 30 * 60 * 1000;
 
+function parseRSS(xml) {
+  const items = [];
+  const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+  let match;
+  while ((match = itemRegex.exec(xml)) !== null) {
+    const block = match[1];
+    const title = (block.match(/<title>([\s\S]*?)<\/title>/) || [])[1] || '';
+    const link = (block.match(/<link>([\s\S]*?)<\/link>/) || [])[1] || '';
+    const pubDate = (block.match(/<pubDate>([\s\S]*?)<\/pubDate>/) || [])[1] || '';
+    const description = (block.match(/<description>([\s\S]*?)<\/description>/) || [])[1] || '';
+    const source = (block.match(/<source[^>]*>([\s\S]*?)<\/source>/) || [])[1] || '';
+    const contentMatch = block.match(/<media:content[^>]*url="([^"]*)"/);
+    const contentUrl = contentMatch ? contentMatch[1] : '';
+    const encMatch = block.match(/<enclosure[^>]*url="([^"]*)"/);
+    const encUrl = encMatch ? encMatch[1] : '';
+
+    items.push({
+      title: title.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim(),
+      url: link.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim(),
+      date: pubDate ? new Date(pubDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : '',
+      description: description.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/<[^>]*>/g, '').trim(),
+      source: source.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim(),
+      image: contentUrl || encUrl || ''
+    });
+  }
+  return items;
+}
+
 async function fetchNews() {
   if (cachedNews && Date.now() - cacheTime < CACHE_TTL) return cachedNews;
 
   try {
-    const res = await fetch('https://albiononline.com/news', {
-      headers: { 'User-Agent': 'Mozilla/5.0' }
-    });
-    const html = await res.text();
-
-    const news = [];
-    const regex = /<a\s+href="(\/news\/[^"]+)"\s+class="news-item[^"]*"[^>]*>[\s\S]*?<h3\s+class="news-item__headline">([\s\S]*?)<\/h3>[\s\S]*?src="([^"]*)"[^>]*>[\s\S]*?<span\s+class="news-item__date">([\s\S]*?)<\/span>[\s\S]*?<div\s+class="news-item__body">\s*<p>([\s\S]*?)<\/p>/g;
-
-    let match;
-    while ((match = regex.exec(html)) !== null) {
-      news.push({
-        url: 'https://albiononline.com' + match[1],
-        title: match[2].trim(),
-        image: match[3].startsWith('//') ? 'https:' + match[3] : match[3],
-        date: match[4].trim(),
-        description: match[5].trim()
-      });
-    }
-
-    cachedNews = news;
+    const res = await fetch(
+      'https://news.google.com/rss/search?q=albion+online+update&hl=pt-BR&gl=BR&ceid=BR:pt-419',
+      { headers: { 'User-Agent': 'Mozilla/5.0' } }
+    );
+    const xml = await res.text();
+    cachedNews = parseRSS(xml).slice(0, 12);
     cacheTime = Date.now();
-    return news;
+    return cachedNews;
   } catch (err) {
     console.error('[news] erro ao buscar:', err.message);
     return cachedNews || [];
@@ -40,7 +54,7 @@ async function fetchNews() {
 
 router.get('/', async (req, res) => {
   const news = await fetchNews();
-  res.json(news.slice(0, 10));
+  res.json(news);
 });
 
 module.exports = router;
