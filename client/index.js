@@ -2,51 +2,13 @@
 
 const AONetwork = require('ao-network');
 const fetch = require('node-fetch');
-const fs = require('fs');
-const path = require('path');
 
-// ── Config ──
-const exeDir = process.pkg ? path.dirname(process.execPath) : __dirname;
-const configPath = path.join(exeDir, 'config.json');
+const SERVER = 'http://191.252.219.229:3000';
 
 function log(msg) { console.log(`[ami-client] ${msg}`); }
 function logError(msg) { console.error(`[ami-client] ERRO: ${msg}`); }
 
-function loadConfig() {
-  if (!fs.existsSync(configPath)) {
-    const defaultConfig = {
-      server: 'http://191.252.219.229:3000',
-      apiKey: 'COLE_SUA_API_KEY_AQUI',
-      name: 'Meu PC',
-      batchInterval: 5000,
-      maxBatchSize: 100
-    };
-    fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2));
-    log(`Config criado em: ${configPath}`);
-    log('Edite o arquivo config.json com sua API key e reinicie.');
-    process.exit(0);
-  }
-  const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-  if (!config.apiKey || config.apiKey === 'COLE_SUA_API_KEY_AQUI') {
-    logError('API key não configurada!');
-    log(`Edite: ${configPath}`);
-    process.exit(1);
-  }
-  return config;
-}
-
 // ── City detection ──
-// Albion city IDs from the game's cluster data
-const CITY_IDS = {
-  'CITY_CAERLEON': 'Caerleon',
-  'CITY_BRIDGEWATCH': 'Bridgewatch',
-  'CITY_LYMHURST': 'Lymhurst',
-  'CITY_MARTLOCK': 'Martlock',
-  'CITY_FORT_STERLING': 'Fort Sterling',
-  'CITY_THETFORD': 'Thetford',
-};
-
-// City name patterns that might appear in cluster data
 const CITY_PATTERNS = [
   { pattern: /caerleon/i, city: 'Caerleon' },
   { pattern: /bridgewatch/i, city: 'Bridgewatch' },
@@ -58,7 +20,6 @@ const CITY_PATTERNS = [
 ];
 
 function detectCity(params) {
-  // Try to detect city from event parameters
   for (const key of Object.keys(params)) {
     const val = params[key];
     if (typeof val === 'string') {
@@ -66,7 +27,6 @@ function detectCity(params) {
         if (pattern.test(val)) return city;
       }
     }
-    // Check nested objects
     if (typeof val === 'object' && val !== null) {
       const str = JSON.stringify(val);
       for (const { pattern, city } of CITY_PATTERNS) {
@@ -78,7 +38,6 @@ function detectCity(params) {
 }
 
 // ── Market data extraction ──
-// The AODP operation codes for auction house
 const AUCTION_OPS = {
   AuctionGetOffers: 75,
   AuctionGetRequests: 76,
@@ -99,21 +58,12 @@ function isSentinel(v) {
 function extractMarketData(operationCode, params) {
   const items = [];
 
-  // Look for arrays in the parameters — these contain the auction listings
   for (const key of Object.keys(params)) {
     const val = params[key];
     if (!Array.isArray(val)) continue;
 
     for (const entry of val) {
       if (!entry || typeof entry !== 'object') continue;
-
-      // Try to extract item data from each entry
-      // Albion auction entries typically contain:
-      // - itemTypeId (string like "T4_BAG")
-      // - quality (int)
-      // - unitPrice (int - price per unit)
-      // - amount (int - quantity)
-      // - auctionType (int - 1=sell, 2=buy)
 
       const itemTypeId = entry.itemTypeId || entry['0'] || entry.itemId;
       const unitPrice = entry.unitPrice || entry['3'] || entry.price;
@@ -135,15 +85,12 @@ function extractMarketData(operationCode, params) {
     }
   }
 
-  // Also try parameter code patterns used by older protocol versions
-  // Parameter '248' often contains the item list in auction responses
   if (params['248'] && Array.isArray(params['248'])) {
     for (const entry of params['248']) {
       if (!entry || typeof entry !== 'object') continue;
       const keys = Object.keys(entry);
       if (keys.length < 2) continue;
 
-      // Try to find item ID and price in the object
       let itemId = null;
       let price = null;
       let quality = 1;
@@ -173,12 +120,10 @@ function extractMarketData(operationCode, params) {
 
 // ── Batch sender ──
 class BatchSender {
-  constructor(config) {
-    this.server = config.server;
-    this.apiKey = config.apiKey;
+  constructor() {
     this.buffer = [];
-    this.batchInterval = config.batchInterval || 5000;
-    this.maxBatchSize = config.maxBatchSize || 100;
+    this.batchInterval = 5000;
+    this.maxBatchSize = 100;
     this.stats = { received: 0, sent: 0, errors: 0, items: 0 };
     this.currentCity = 'Caerleon';
 
@@ -211,12 +156,9 @@ class BatchSender {
     const batch = this.buffer.splice(0, this.maxBatchSize);
 
     try {
-      const res = await fetch(`${this.server}/api/ingest`, {
+      const res = await fetch(`${SERVER}/api/ingest`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': this.apiKey,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(batch),
         timeout: 10000,
       });
@@ -225,7 +167,6 @@ class BatchSender {
         const text = await res.text();
         logError(`Servidor ${res.status}: ${text}`);
         this.stats.errors++;
-        // Put items back for retry
         this.buffer.unshift(...batch);
         return;
       }
@@ -248,20 +189,16 @@ class BatchSender {
 
 // ── Main ──
 function main() {
-  const config = loadConfig();
-  const sender = new BatchSender(config);
+  const sender = new BatchSender();
 
   log('---');
   log('Albion Market Insights - Cliente v2.0');
-  log(`Servidor: ${config.server}`);
-  log(`Nome: ${config.name || 'Sem nome'}`);
   log('---');
   log('Iniciando captura de pacotes...');
   log('Abra o Albion Online e visite o mercado para enviar dados.');
   log('Pressione Ctrl+C para sair.');
   log('');
 
-  // Initialize packet capture
   let aoNet;
   try {
     aoNet = new AONetwork();
@@ -269,15 +206,14 @@ function main() {
     logError(`Falha ao iniciar captura: ${err.message}`);
     log('');
     log('Possíveis causas:');
-    log('  1. Npcap não instalado — baixe de: https://npcap.com/#download');
+    log('  1. Npcap não instalado — execute npcap-1.88.exe');
     log('  2. Não está rodando como administrador');
     log('  3. Nenhuma interface de rede ativa');
     log('');
-    log('Instale o Npcap (opção WinPcap compat) e reinicie este programa como admin.');
+    log('Instale o Npcap (opção WinPcap compat) e reinicie como admin.');
     process.exit(1);
   }
 
-  // Listen for ALL decoded messages to detect city changes
   aoNet.events.use((result) => {
     const ctx = result.context;
     if (!ctx || !ctx.parameters) return;
@@ -289,14 +225,12 @@ function main() {
     }
   });
 
-  // Listen for OperationResponses (auction data)
   aoNet.events.on(aoNet.AODecoder.messageType.OperationResponse, (context) => {
     if (!context || !context.parameters) return;
 
     const opCode = context.parameters['253'];
     if (opCode === undefined) return;
 
-    // Check if it's an auction-related operation
     const isAuction = Object.values(AUCTION_OPS).includes(opCode);
     if (!isAuction) return;
 
@@ -307,14 +241,12 @@ function main() {
     }
   });
 
-  // Also listen for Events (some market data comes as events)
   aoNet.events.on(aoNet.AODecoder.messageType.Event, (context) => {
     if (!context || !context.parameters) return;
 
     const eventCode = context.parameters['252'];
     if (eventCode === undefined) return;
 
-    // MarketPlaceNotification event (181)
     if (eventCode === 181) {
       const items = extractMarketData(eventCode, context.parameters);
       if (items.length > 0) {
@@ -324,7 +256,6 @@ function main() {
     }
   });
 
-  // Stats display every 30s
   setInterval(() => {
     const s = sender.getStats();
     if (s.received > 0) {
@@ -332,7 +263,6 @@ function main() {
     }
   }, 30000);
 
-  // Graceful shutdown
   process.on('SIGINT', () => {
     log('Encerrando...');
     sender.flush().then(() => process.exit(0));

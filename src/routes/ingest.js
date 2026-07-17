@@ -1,6 +1,5 @@
 const express = require('express');
 const { getDb } = require('../db/init');
-const { requireContributorKey } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -16,20 +15,9 @@ function isSentinel(v) {
 
 /**
  * POST /api/ingest
- * Body: array de observações de preço, no formato que o albiondata-client
- * (ou seu Express ingest server local) já produz. Exemplo de item:
- * {
- *   "itemId": "T4_BAG",
- *   "city": "Caerleon",
- *   "quality": 1,
- *   "sellPriceMin": 1200,
- *   "sellPriceMax": 1500,
- *   "buyPriceMin": 900,
- *   "buyPriceMax": 1100,
- *   "timestamp": "2026-07-17T12:00:00Z"
- * }
+ * Accepts anonymous market data from any client.
  */
-router.post('/', requireContributorKey, (req, res) => {
+router.post('/', (req, res) => {
   const payload = Array.isArray(req.body) ? req.body : [req.body];
   const db = getDb();
 
@@ -60,7 +48,7 @@ router.post('/', requireContributorKey, (req, res) => {
         buy_price_min: isSentinel(row.buyPriceMin) ? null : row.buyPriceMin ?? null,
         buy_price_max: isSentinel(row.buyPriceMax) ? null : row.buyPriceMax ?? null,
         observed_at: row.timestamp,
-        contributor_id: req.contributor.id,
+        contributor_id: null,
       });
       inserted += 1;
     }

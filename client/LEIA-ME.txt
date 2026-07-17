@@ -12,101 +12,41 @@ O QUE E?
   ter dados de mercado atualizados.
 
 
-COMO INSTALAR (passo a passo):
-------------------------------
+COMO INSTALAR:
+--------------
 
-  PASSO 1 - CRIAR CONTA
-  ======================
-  Acesse: http://191.252.219.229:3000/#/register
-  Crie sua conta. Sua API Key sera gerada
-  automaticamente.
-
-  PASSO 2 - COPIAR API KEY
-  ========================
-  Acesse: http://191.252.219.229:3000/#/parceiros
-  Copie sua API Key (clique no botao ao lado).
-
-  PASSO 3 - DESCOMPACTAR
+  PASSO 1 - DESCOMPACTAR
   =======================
   Descompacte este arquivo numa pasta.
-  Pode ser qualquer pasta, ex:
-    C:\Users\SeuNome\Documents\albion-client\
 
-  PASSO 4 - INSTALAR NPCAP
+  PASSO 2 - INSTALAR NPCAP
   =========================
-  O Npcap e necessario para capturar os dados
-  de rede do jogo.
+  Execute npcap-1.88.exe que vem nesta pasta.
+  Marque [x] WinPcap API-compatible Mode.
+  Reinicie se pedir.
 
-  a) Execute o arquivo npcap-1.88.exe que vem
-     nesta pasta
-
-  b) Na tela de instalacao, MARQUE a opcao:
-     [x] WinPcap API-compatible Mode
-     (isso fica na ultima tela do instalador)
-
-  c) Clique em Install e aguarde
-
-  d) Se pedir pra reiniciar, reinicie o PC
-
-  PASSO 5 - CONFIGURAR
-  =====================
-  a) Execute o arquivo CONFIGURAR.bat
-     (clique com botao direito > Executar como
-     administrador)
-
-  b) Digite seu nome/gamertag
-
-  c) Cole sua API Key (que voce copiou no site)
-
-  d) Pronto! O config.json sera criado
-
-  PASSO 6 - INICIAR
+  PASSO 3 - INICIAR
   ==================
-  a) Abra o Albion Online e entre no jogo
+  1. Abra o Albion Online e entre no jogo
+  2. Execute INICIAR.bat como ADMINISTRADOR
+  3. Va ate o mercado no jogo
+  4. Clique nos itens pra ver precos
+  5. Os dados sao enviados automaticamente!
 
-  b) MINIMIZE o jogo (nao feche)
-
-  c) Execute INICIAR.bat
-     IMPORTANTE: clique com botao DIREITO >
-     "Executar como administrador"
-
-  d) Volte pro jogo e va ate o mercado
-
-  e) Clique nos itens pra ver os precos
-     (abra pelo menos 1 pagina de precos)
-
-  f) Os dados sao enviados automaticamente!
-
-
-COMO FUNCIONA POR DENTRO:
--------------------------
-  1. O client ficar escutando os pacotes de rede
-     que o jogo envia/recebe (porta UDP 5056)
-
-  2. Quando voce abre o mercado no jogo, o client
-     captura os precos que o servidor manda
-
-  3. A cada 5 segundos, os dados capturados sao
-     enviados pro servidor em lotes
-
-  4. No servidor, os dados ficam disponiveis pra
-     todo mundo no site
+  IMPORTANTE: Execute INICIAR.bat como
+  Administrador toda vez que for jogar.
 
 
 O QUE E ENVIADO?
 ----------------
-  Apenas dados de mercado publicos:
+  Apenas precos de mercado:
   - Item ID (ex: T4_BAG)
   - Cidade (ex: Caerleon)
   - Precos (sell/buy min/max)
   - Qualidade do item
   - Timestamp
 
-  NAO e enviado:
-  - Sua senha
-  - Seus itens
-  - Sua localizacao
-  - Qualquer dado pessoal
+  NAO e enviado sua senha, itens, ou dados pessoais.
 
 
 REQUISITOS:
@@ -122,50 +62,20 @@ PROBLEMAS COMUNS:
 -----------------
 
   "Nao consigo executar como administrador"
-    -> Clique com botao DIREITO no .bat
+    -> Clique com botao DIREITO no INICIAR.bat
     -> Selecione "Executar como administrador"
-    -> Nao e so dar duplo clique!
 
   "O client abre e fecha rapido"
     -> Provavelmente nao esta rodando como admin
-    -> Execute novamente como administrador
 
   "ERRO: Npcap nao encontrado"
-    -> Instale o npcap-1.88.exe que esta na pasta
+    -> Execute npcap-1.88.exe da pasta
     -> Marque "WinPcap API-compatible Mode"
-    -> Reinicie o PC depois de instalar
-
-  "ERRO: API key invalida"
-    -> Execute CONFIGURAR.bat
-    -> Cole sua API key corretamente
-    -> A key fica no painel do site
 
   "Nao aparece nada no client"
     -> Verifique se o Albion Online esta aberto
-    -> Va ate o mercado no jogo
-    -> Clique em alguns itens pra carregar precos
-
-  "O jogo trava com o client aberto"
-    -> O client nao interfere no jogo
-    -> Ele so le os pacotes de rede
-    -> Se travar, feche e reabra o client
-
-
-ONDE BAIXAR:
-------------
-  https://github.com/matheussantos-web/albion-market-insights
-  Pasta: client/dist/
-
-
-TUTORIAL POR VIDEO:
--------------------
-  (se disponivel, confira o canal da guild)
+    -> Va ate o mercado e clique em alguns itens
 
 
 OBRIGADO POR CONTRIBUIR!
-  Com seus dados, todo mundo da guild
-  consegue ver precos atualizados e
-  encontrar as melhores oportunidades
-  de mercado.
-
 ===============================================
