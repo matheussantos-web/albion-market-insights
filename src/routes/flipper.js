@@ -177,11 +177,15 @@ function flipUpgrade(db, req) {
     ORDER BY mp.observed_at DESC
   `).all(...priceArgs);
 
-  // Dedup: latest per item+city+enchant
+  // Derive base_name (strip @N suffix) and dedup: latest per base+city+enchant
   const latest = {};
   for (const row of allPrices) {
-    const key = `${row.item_unique_name}|${row.city_name}|${row.enchantment}`;
-    if (!latest[key]) latest[key] = row;
+    const baseName = row.item_unique_name.replace(/@\d+$/, '');
+    const enchant = row.enchantment;
+    const key = `${baseName}|${row.city_name}|${enchant}`;
+    if (!latest[key]) {
+      latest[key] = { ...row, base_name: baseName };
+    }
   }
 
   // Get upgrade costs
@@ -191,7 +195,7 @@ function flipUpgrade(db, req) {
   const opportunities = [];
   for (const key in latest) {
     const low = latest[key];
-    const highKey = `${low.item_unique_name}|${low.city_name}|${low.enchantment + 1}`;
+    const highKey = `${low.base_name}|${low.city_name}|${low.enchantment + 1}`;
     const high = latest[highKey];
     if (!high) continue;
 
@@ -217,8 +221,8 @@ function flipUpgrade(db, req) {
     if (netProfit < Number(minProfit)) continue;
 
     opportunities.push({
-      item_id: low.item_unique_name,
-      item_name: low.name_ptbr || low.name_en || low.item_unique_name,
+      item_id: low.base_name,
+      item_name: low.name_ptbr || low.name_en || low.base_name,
       tier: low.tier,
       category: low.category,
       city: low.city_name,
