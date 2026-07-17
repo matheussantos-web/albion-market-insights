@@ -10,6 +10,11 @@ echo  Este instalador vai configurar tudo
 echo  pra voce contribuir com dados de mercado
 echo  do Albion Online pro servidor da guild.
 echo.
+echo  ANTES DE COMECAR:
+echo  1. Acesse http://191.252.219.229:3000/#/register
+echo  2. Crie sua conta (voces ja vai ganhar uma API Key)
+echo  3. Va em Contribuidor pra copiar sua chave
+echo.
 echo ============================================
 echo.
 
@@ -127,11 +132,14 @@ echo ============================================
 echo.
 echo  Proximos passos:
 echo.
-echo  1. Abra o Albion Online
-echo  2. Execute INICIAR.bat como administrador
-echo  3. Va ate o mercado no jogo
-echo  4. Clique nos itens pra ver precos
-echo  5. Os dados sao enviados automaticamente!
+echo  1. Acesse http://191.252.219.229:3000/#/parceiros
+echo  2. Copie sua API Key
+echo  3. Execute CONFIGURAR.bat e cole a chave
+echo  4. Abra o Albion Online
+echo  5. Execute INICIAR.bat como administrador
+echo  6. Va ate o mercado no jogo
+echo  7. Clique nos itens pra ver precos
+echo  8. Os dados sao enviados automaticamente!
 echo.
 echo  IMPORTANTE: Execute INICIAR.bat como
 echo  Administrador toda vez que for jogar.
