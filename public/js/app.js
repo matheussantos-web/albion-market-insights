@@ -177,7 +177,7 @@ function renderLatest(itemId, rows) {
   if (!rows.length) {
     empty.style.display = '';
     content.style.display = 'none';
-    empty.querySelector('p').textContent = 'Sem dados de pre\u00e7o para este item';
+    empty.querySelector('p').textContent = 'Sem dados de preço para este item';
     return;
   }
 
@@ -228,7 +228,7 @@ function renderStats(latest, history) {
   if (!history.length) {
     empty.style.display = '';
     content.style.display = 'none';
-    empty.querySelector('p').textContent = 'Sem dados suficientes para estat\u00edsticas';
+    empty.querySelector('p').textContent = 'Sem dados suficientes para estatísticas';
     return;
   }
 
@@ -250,21 +250,21 @@ function renderStats(latest, history) {
     <div class="stats-row">
       <div class="stat-card">
         <div class="value">${fmt(avgSell)}</div>
-        <div class="label">Pre\u00e7o venda m\u00e9dio</div>
+        <div class="label">Preço venda médio</div>
       </div>
       <div class="stat-card">
         <div class="value">${fmt(minSell)}</div>
-        <div class="label">Pre\u00e7o venda m\u00edn</div>
+        <div class="label">Preço venda mín</div>
       </div>
       <div class="stat-card">
         <div class="value">${fmt(maxSell)}</div>
-        <div class="label">Pre\u00e7o venda m\u00e1x</div>
+        <div class="label">Preço venda máx</div>
       </div>
     </div>
     <div class="stats-row">
       <div class="stat-card">
         <div class="value">${fmt(avgBuy)}</div>
-        <div class="label">Pre\u00e7o compra m\u00e9dio</div>
+        <div class="label">Preço compra médio</div>
       </div>
       <div class="stat-card">
         <div class="value">${history.length}</div>
