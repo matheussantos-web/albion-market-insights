@@ -44,23 +44,27 @@ Router.register('/', async (app) => {
           </div>
           ${news.updates.length ? `
             <div class="news-featured">
-              <a href="${news.updates[0].url}" target="_blank" class="news-card news-card-featured">
+              <a href="https://albiononline.com/update/${news.updates[0].slug}" target="_blank" class="news-card news-card-featured">
                 ${news.updates[0].image ? `<div class="news-card-img news-card-img-lg"><img src="${news.updates[0].image}" alt="${news.updates[0].title}" loading="lazy" /></div>` : ''}
                 <div class="news-card-body">
-                  <div class="news-card-source">${news.updates[0].source}</div>
                   <div class="news-card-title news-card-title-lg">${news.updates[0].title}</div>
-                  <div class="news-card-date">${news.updates[0].date}</div>
+                  ${news.updates[0].description ? `<div class="news-card-desc">${news.updates[0].description}</div>` : ''}
+                  <div class="news-card-footer">
+                    <span class="news-card-date">${news.updates[0].date}</span>
+                    <span class="news-card-cta">Leia Mais →</span>
+                  </div>
                 </div>
               </a>
             </div>
             <div class="news-grid">
               ${news.updates.slice(1, 7).map(n => `
-                <a href="${n.url}" target="_blank" class="news-card">
+                <a href="https://albiononline.com/update/${n.slug}" target="_blank" class="news-card">
                   ${n.image ? `<div class="news-card-img"><img src="${n.image}" alt="${n.title}" loading="lazy" /></div>` : ''}
                   <div class="news-card-body">
-                    <div class="news-card-source">${n.source}</div>
                     <div class="news-card-title">${n.title}</div>
-                    <div class="news-card-date">${n.date}</div>
+                    <div class="news-card-footer">
+                      <span class="news-card-date">${n.date}</span>
+                    </div>
                   </div>
                 </a>
               `).join('')}
@@ -77,7 +81,7 @@ Router.register('/', async (app) => {
           </div>
           <div class="changelog-list">
             ${news.changelogs.map(c => `
-              <a href="${c.url}" target="_blank" class="changelog-item">
+              <a href="https://albiononline.com/changelog/${c.slug}" target="_blank" class="changelog-item">
                 <span class="changelog-title">${c.title}</span>
                 <span class="changelog-date">${c.date}</span>
               </a>
