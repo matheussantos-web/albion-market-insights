@@ -4,6 +4,8 @@ const cache = require('../services/priceCache');
 
 const router = express.Router();
 
+const SENTINEL_FILTER = 'AND mp.sell_price_min > 0 AND mp.sell_price_min < 50000000';
+
 // GET /api/prices/compare?item=T4_BAG — compara preços entre cidades
 router.get('/compare', (req, res) => {
   const { item } = req.query;
@@ -22,6 +24,7 @@ router.get('/compare', (req, res) => {
         SELECT mp2.id FROM market_prices mp2
         WHERE mp2.item_unique_name = mp.item_unique_name
           AND mp2.location_id = mp.location_id
+          ${SENTINEL_FILTER}
         ORDER BY mp2.observed_at DESC
         LIMIT 1
       )
@@ -44,6 +47,7 @@ router.get('/:uniqueName', (req, res) => {
     JOIN locations l ON l.id = mp.location_id
     LEFT JOIN items i ON i.unique_name = mp.item_unique_name
     WHERE mp.item_unique_name = ?
+      ${SENTINEL_FILTER}
   `;
   const params = [req.params.uniqueName];
 
@@ -76,10 +80,12 @@ router.get('/:uniqueName/latest', (req, res) => {
     JOIN locations l ON l.id = mp.location_id
     LEFT JOIN items i ON i.unique_name = mp.item_unique_name
     WHERE mp.item_unique_name = ?
+      ${SENTINEL_FILTER}
       AND mp.id = (
         SELECT mp2.id FROM market_prices mp2
         WHERE mp2.item_unique_name = mp.item_unique_name
           AND mp2.location_id = mp.location_id
+          ${SENTINEL_FILTER}
         ORDER BY mp2.observed_at DESC
         LIMIT 1
       )
