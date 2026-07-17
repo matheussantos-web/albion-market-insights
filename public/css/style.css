@@ -514,8 +514,8 @@ a:hover { color: var(--text); }
 /* ── Carousel ── */
 .carousel {
   position: relative;
-  width: 100%;
-  max-width: 1200px;
+  width: 1200px;
+  max-width: calc(100% - 3rem);
   margin: 0 auto;
   height: 340px;
   overflow: hidden;

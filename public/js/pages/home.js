@@ -14,7 +14,7 @@ Router.register('/', async (app) => {
     ];
 
     app.innerHTML = `
-      <div class="carousel" id="carousel" style="margin:0 1.5rem">
+      <div class="carousel" id="carousel">
         <div class="carousel-track" id="carouselTrack">
           ${SLIDES.map((s, i) => `
             <div class="carousel-slide">
