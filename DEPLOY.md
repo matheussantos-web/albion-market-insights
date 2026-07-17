@@ -65,7 +65,7 @@ Variáveis obrigatórias:
 ### 4. Importar itens
 
 ```bash
-npm run import-items
+npm run import:items
 ```
 
 ### 5. Iniciar com PM2
@@ -158,6 +158,6 @@ chown -R www-data:www-data .
 ```bash
 # Resetar banco
 rm data/albion_market.db
-npm run import-items
+npm run import:items
 pm2 restart all
 ```

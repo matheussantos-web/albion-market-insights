@@ -32,7 +32,7 @@ npm install --production
 
 # Import items
 echo "[5/7] Importing items..."
-npm run import-items
+npm run import:items
 
 # Create logs directory
 mkdir -p logs

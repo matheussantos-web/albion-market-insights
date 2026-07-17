@@ -90,7 +90,7 @@ fi
 # FASE 7: Importar itens
 # ============================================
 echo -e "${YELLOW}[8/8] Importando itens...${NC}"
-npm run import-items
+npm run import:items
 
 # ============================================
 # FASE 8: Criar logs e iniciar
