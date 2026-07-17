@@ -17,7 +17,7 @@
       <input type="text" id="searchInput" placeholder="Buscar item..." autocomplete="off" />
       <div class="search-results" id="searchResults"></div>
     </div>
-    <div class="header-filters">
+    <div class="header-actions">
       <select id="cityFilter">
         <option value="">Todas as cidades</option>
         <option value="Caerleon">Caerleon</option>
@@ -33,33 +33,33 @@
         <option value="private">Privado</option>
         <option value="public_adp">AODP</option>
       </select>
+      <button id="syncBtn" class="sync-btn" title="Sincronizar watchlist com AODP">Sync AODP</button>
     </div>
-    <button id="syncBtn" class="sync-btn" title="Sincronizar watchlist com AODP">Sync AODP</button>
   </header>
 
   <div class="layout">
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
         <h2>Categorias</h2>
-        <span class="category-count" id="categoryCount"></span>
       </div>
-      <div class="sidebar-search">
-        <input type="text" id="categorySearch" placeholder="Filtrar categoria..." />
-      </div>
-      <div class="category-list" id="categoryList">
-        <div class="loading-small">Carregando...</div>
-      </div>
+      <nav class="category-tree" id="categoryTree"></nav>
     </aside>
 
     <div class="main">
-      <div class="tier-filter" id="tierFilter">
-        <button data-tier="">Todos</button>
+      <div class="tier-bar" id="tierBar">
+        <span class="tier-label">Tier:</span>
+        <button data-tier="" class="active">Todos</button>
         <button data-tier="3">T3</button>
         <button data-tier="4">T4</button>
         <button data-tier="5">T5</button>
         <button data-tier="6">T6</button>
         <button data-tier="7">T7</button>
         <button data-tier="8">T8</button>
+      </div>
+
+      <div class="selected-info" id="selectedInfo" style="display:none">
+        <span class="selected-cat-label" id="selectedCatLabel"></span>
+        <button class="clear-filter" id="clearFilter">✕</button>
       </div>
 
       <div class="panels">
