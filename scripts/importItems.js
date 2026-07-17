@@ -15,58 +15,96 @@ function parseEnchantment(uniqueName) {
 
 function parseCategory(uniqueName) {
   const u = uniqueName.replace(/@\d$/, '');
-  if (/^T\d_MAIN_SWORD/.test(u)) return 'Espadas';
-  if (/^T\d_2H_DUALSWORD/.test(u)) return 'Espadas Duplas';
-  if (/^T\d_MAIN_AXE/.test(u)) return 'Machados';
-  if (/^T\d_2H_AXE/.test(u)) return 'Machados Duplos';
-  if (/^T\d_MAIN_MACE/.test(u)) return 'Macas';
-  if (/^T\d_2H_MACE/.test(u)) return 'Macas Duplas';
-  if (/^T\d_MAIN_SPEAR/.test(u)) return 'Lancas';
-  if (/^T\d_2H_SPEAR/.test(u)) return 'Lancas Duplas';
-  if (/^T\d_MAIN_BOW/.test(u)) return 'Arcos';
-  if (/^T\d_2H_BOW/.test(u)) return 'Arcos Recurvos';
-  if (/^T\d_MAIN_CURSEDSTAFF/.test(u)) return 'Cajados Amaldicoados';
-  if (/^T\d_2H_CURSEDSTAFF/.test(u)) return 'Cajados Amaldicoados Duplos';
-  if (/^T\d_MAIN_HOLYSTAFF/.test(u)) return 'Cajados Sagrados';
-  if (/^T\d_2H_HOLYSTAFF/.test(u)) return 'Cajados Sagrados Duplos';
-  if (/^T\d_MAIN_FIRESTAFF/.test(u)) return 'Cajados de Fogo';
-  if (/^T\d_2H_FIRESTAFF/.test(u)) return 'Cajados de Fogo Duplos';
-  if (/^T\d_MAIN_ARCANESTAFF/.test(u)) return 'Cajados Arcanos';
-  if (/^T\d_2H_ARCANESTAFF/.test(u)) return 'Cajados Arcanos Duplos';
-  if (/^T\d_MAIN_NATURESTAFF/.test(u)) return 'Cajados da Natureza';
-  if (/^T\d_2H_NATURESTAFF/.test(u)) return 'Cajados da Natureza Duplos';
-  if (/^T\d_MAIN_DAGGER/.test(u)) return 'Adagas';
-  if (/^T\d_2H_DAGGER/.test(u)) return 'Adagas Duplas';
-  if (/^T\d_MAIN_QUARRELSTAFF/.test(u)) return 'Balestras';
-  if (/^T\d_2H_QUARRELSTAFF/.test(u)) return 'Balestras Duplas';
-  if (/^T\d_MAIN_CROSSBOW/.test(u)) return 'Bestas';
-  if (/^T\d_2H_CROSSBOW/.test(u)) return 'Bestas Duplas';
+
+  // ── Armas corpo a corpo ──
+  if (/^T\d_(MAIN_SWORD|2H_DUALSWORD)/.test(u)) return 'Espadas';
+  if (/^T\d_(MAIN_AXE|2H_AXE)/.test(u)) return 'Machados';
+  if (/^T\d_(MAIN_MACE|2H_MACE)/.test(u)) return 'Macas';
+  if (/^T\d_(MAIN_SPEAR|2H_SPEAR)/.test(u)) return 'Lancas';
+  if (/^T\d_(MAIN_ROCK|2H_ROCK)/.test(u)) return 'Martelos';
+  if (/^T\d_MAIN_HAMMER/.test(u)) return 'Martelos';
+  if (/^T\d_2H_HAMMER/.test(u)) return 'Martelos';
+  if (/^T\d_MAIN_CLAW/.test(u)) return 'Luvas de Guerra';
+  if (/^T\d_2H_CLAW/.test(u)) return 'Luvas de Guerra';
+
+  // ── Armas a distancia ──
+  if (/^T\d_(MAIN_BOW|2H_BOW)/.test(u)) return 'Arcos';
+  if (/^T\d_(MAIN_CROSSBOW|2H_CROSSBOW)/.test(u)) return 'Bestas';
+  if (/^T\d_(MAIN_DAGGER|2H_DAGGER)/.test(u)) return 'Adagas';
+
+  // ── Cajados (Mago) ──
+  if (/^T\d_(MAIN_FIRESTAFF|2H_FIRESTAFF)/.test(u)) return 'Cajados de Fogo';
+  if (/^T\d_(MAIN_HOLYSTAFF|2H_HOLYSTAFF)/.test(u)) return 'Cajados Sagrados';
+  if (/^T\d_(MAIN_ARCANESTAFF|2H_ARCANESTAFF)/.test(u)) return 'Cajados Arcanos';
+  if (/^T\d_(MAIN_FROSTSTAFF|2H_FROSTSTAFF)/.test(u)) return 'Cajados de Gelo';
+  if (/^T\d_(MAIN_CURSEDSTAFF|2H_CURSEDSTAFF)/.test(u)) return 'Cajados Amaldicoados';
+  if (/^T\d_(MAIN_NATURESTAFF|2H_NATURESTAFF)/.test(u)) return 'Cajados da Natureza';
+
+  // ── Outras armas ──
+  if (/^T\d_2H_QUARRELSTAFF/.test(u)) return 'Quarterstaffs';
+  if (/^T\d_MAIN_QUARRELSTAFF/.test(u)) return 'Quarterstaffs';
+  if (/^T\d_2H_TALISMAN/.test(u)) return 'Talismas';
   if (/^T\d_MAIN_TALISMAN/.test(u)) return 'Talismas';
-  if (/^T\d_2H_TALISMAN/.test(u)) return 'Talismas Duplos';
-  if (/^T\d_MAIN_ROCK/.test(u)) return 'Pedras';
-  if (/^T\d_2H_ROCK/.test(u)) return 'Pedras Duplas';
-  if (/^T\d_ARMOR_/?.test(u)) return 'Armaduras';
-  if (/^T\d_2H_ARMOR_/.test(u)) return 'Armaduras Pesadas';
+
+  // ── Off-hand ──
+  if (/^T\d_MAIN_SHIELD/.test(u)) return 'Escudos';
+  if (/^T\d_2H_SHIELD/.test(u)) return 'Escudos';
+  if (/^T\d_OFF_/.test(u)) return 'Escudos';
+  if (/^T\d_MAIN_TORCH/.test(u)) return 'Tochas';
+  if (/^T\d_MAIN_BOOK/.test(u)) return 'Livros';
+  if (/^T\d_MAIN_HORN/.test(u)) return 'Chifres';
+  if (/^T\d_MAIN_TOTEM/.test(u)) return 'Totens';
+  if (/^T\d_MAIN_ORB/.test(u)) return 'Orbes';
+  if (/^T\d_MAIN_RUNE/.test(u)) return 'Runas';
+  if (/^T\d_MAIN_SCROLL/.test(u)) return 'Pergaminhos';
+
+  // ── Armaduras (por slot) ──
+  if (/^T\d_HEAD_PLATE/.test(u)) return 'Capacete de Placa';
+  if (/^T\d_ARMOR_PLATE/.test(u)) return 'Armadura de Placa';
+  if (/^T\d_SHOES_PLATE/.test(u)) return 'Botas de Placa';
+  if (/^T\d_HEAD_LEATHER/.test(u)) return 'Capacete de Couro';
+  if (/^T\d_ARMOR_LEATHER/.test(u)) return 'Armadura de Couro';
+  if (/^T\d_SHOES_LEATHER/.test(u)) return 'Botas de Couro';
+  if (/^T\d_HEAD_CLOTH/.test(u)) return 'Capacete de Tecido';
+  if (/^T\d_ARMOR_CLOTH/.test(u)) return 'Armadura de Tecido';
+  if (/^T\d_SHOES_CLOTH/.test(u)) return 'Botas de Tecido';
+  if (/^T\d_ARMOR_/.test(u)) return 'Armaduras';
   if (/^T\d_HEAD_/.test(u)) return 'Capacetes';
   if (/^T\d_SHOES_/.test(u)) return 'Botas';
-  if (/^T\d_ARMOR_.*_SET/.test(u)) return 'Conjuntos';
+
+  // ── Acessorios ──
   if (/^T\d_BAG/.test(u)) return 'Bolsas';
   if (/^T\d_CAPE/.test(u)) return 'Capas';
+
+  // ── Montarias ──
   if (/^T\d_MOUNT_/.test(u)) return 'Montarias';
-  if (/^T\d_FISH_/.test(u)) return 'Pesca';
-  if (/^T\d_FOOD_/.test(u)) return 'Comida';
+
+  // ── Consumiveis ──
   if (/^T\d_POTION_/.test(u)) return 'Pocoes';
-  if (/^T\d_GEM_/.test(u)) return 'Gemas';
-  if (/^T\d_PLANK/.test(u)) return 'Pranchas';
-  if (/^T\d_ORE/.test(u)) return 'Minerios';
-  if (/^T\d_HIDE/.test(u)) return 'Couro';
-  if (/^T\d_FIBER/.test(u)) return 'Fibras';
-  if (/^T\d_CLOTH/.test(u)) return 'Tecidos';
-  if (/^T\d_LEATHER/.test(u)) return 'Couro Trabalhado';
-  if (/^T\d_METALBAR/.test(u)) return 'Barras de Metal';
-  if (/^T\d_STONE/.test(u)) return 'Pedra';
+  if (/^T\d_FOOD_/.test(u)) return 'Comida';
+  if (/^T\d_FISH_/.test(u)) return 'Pesca';
+
+  // ── Recursos brutos ──
+  if (/^T\d_ORE/.test(u)) return 'Minerio';
   if (/^T\d_WOOD/.test(u)) return 'Madeira';
-  if (/^UNIQUE_/?.test(u)) return 'Itens Unicos';
+  if (/^T\d_FIBER/.test(u)) return 'Fibra';
+  if (/^T\d_HIDE/.test(u)) return 'Couro Bruto';
+  if (/^T\d_STONE_/.test(u)) return 'Pedra';
+
+  // ── Recursos refinados ──
+  if (/^T\d_METALBAR/.test(u)) return 'Barra de Metal';
+  if (/^T\d_PLANK/.test(u)) return 'Prancha';
+  if (/^T\d_CLOTH/.test(u)) return 'Tecido';
+  if (/^T\d_LEATHER/.test(u)) return 'Couro';
+  if (/^T\d_STONEBLOCK/.test(u)) return 'Bloco de Pedra';
+
+  // ── Ferramentas ──
+  if (/^T\d_2H_TOOL_/.test(u)) return 'Ferramentas';
+  if (/^T\d_MAIN_TOOL_/.test(u)) return 'Ferramentas';
+
+  // ── Outros ──
+  if (/^T\d_GEM_/.test(u)) return 'Gemas';
+  if (/UNIQUE_/.test(u)) return 'Itens Unicos';
   if (/PLAYERISLAND_/.test(u)) return 'Decoracao';
   if (/FURNITUREITEM_/.test(u)) return 'Mobilha';
   return 'Outros';
