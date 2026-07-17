@@ -786,6 +786,40 @@ a:hover { color: var(--text); }
   color: var(--text-muted);
 }
 
+/* ── Changelog List ── */
+.changelog-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.changelog-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  text-decoration: none;
+  color: var(--text);
+  transition: all 0.15s;
+}
+.changelog-item:hover {
+  border-color: var(--gold-dim);
+  background: var(--surface2);
+}
+.changelog-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.changelog-date {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+  margin-left: 1rem;
+}
+
 /* ── How It Works ── */
 .how-it-works {
   display: grid;

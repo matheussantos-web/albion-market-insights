@@ -4,51 +4,84 @@ const router = express.Router();
 
 let cachedNews = null;
 let cacheTime = 0;
-const CACHE_TTL = 30 * 60 * 1000;
+const CACHE_TTL = 24 * 60 * 60 * 1000;
 
-function parseRSS(xml) {
-  const items = [];
-  const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+function parseUpdates(html) {
+  const updates = [];
+  const sidebarRegex = /<li class="sidebar-item[^"]*">\s*<a href="\/update\/([^"]+)" class="sidebar-link">([\s\S]*?)<\/li>/g;
   let match;
-  while ((match = itemRegex.exec(xml)) !== null) {
-    const block = match[1];
-    const title = (block.match(/<title>([\s\S]*?)<\/title>/) || [])[1] || '';
-    const link = (block.match(/<link>([\s\S]*?)<\/link>/) || [])[1] || '';
-    const pubDate = (block.match(/<pubDate>([\s\S]*?)<\/pubDate>/) || [])[1] || '';
-    const description = (block.match(/<description>([\s\S]*?)<\/description>/) || [])[1] || '';
-    const source = (block.match(/<source[^>]*>([\s\S]*?)<\/source>/) || [])[1] || '';
-    const contentMatch = block.match(/<media:content[^>]*url="([^"]*)"/);
-    const contentUrl = contentMatch ? contentMatch[1] : '';
-    const encMatch = block.match(/<enclosure[^>]*url="([^"]*)"/);
-    const encUrl = encMatch ? encMatch[1] : '';
-
-    items.push({
-      title: title.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim(),
-      url: link.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim(),
-      date: pubDate ? new Date(pubDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : '',
-      description: description.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/<[^>]*>/g, '').trim(),
-      source: source.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim(),
-      image: contentUrl || encUrl || ''
-    });
+  while ((match = sidebarRegex.exec(html)) !== null) {
+    const slug = match[1];
+    const block = match[2];
+    const imgMatch = block.match(/src="([^"]+)"/);
+    const textMatch = block.match(/<span class="sidebar-text">\s*([\s\S]*?)\s*<\/span>/);
+    let title = '';
+    let date = '';
+    if (textMatch) {
+      const parts = textMatch[1].split('<br>').map(s => s.trim()).filter(Boolean);
+      title = (parts[0] || '').replace(/<[^>]*>/g, '').trim();
+      date = (parts[1] || '').trim();
+    }
+    if (title) {
+      updates.push({
+        title,
+        url: 'https://albiononline.com/update/' + slug,
+        date,
+        image: imgMatch ? (imgMatch[1].startsWith('//') ? 'https:' + imgMatch[1] : imgMatch[1]) : '',
+        source: 'Sandbox Interactive'
+      });
+    }
   }
-  return items;
+  return updates;
+}
+
+function parseChangelogs(html) {
+  const logs = [];
+  const clRegex = /<li class="sidebar-item">\s*<a href="\/changelog\/([^"]+)" class="sidebar-link">\s*<span class="sidebar-text sidebar-text--no-img">\s*([\s\S]*?)\s*<\/span>/g;
+  let match;
+  while ((match = clRegex.exec(html)) !== null) {
+    const slug = match[1];
+    const text = match[2].replace(/<[^>]*>/g, '').trim();
+    const parts = text.split('|').map(s => s.trim());
+    const title = (parts[0] || '').replace(/\n/g, ' ').trim();
+    const date = (parts[1] || '').trim();
+    if (title) {
+      logs.push({
+        title,
+        url: 'https://albiononline.com/changelog/' + slug,
+        date,
+        image: '',
+        source: 'Sandbox Interactive'
+      });
+    }
+  }
+  return logs;
 }
 
 async function fetchNews() {
   if (cachedNews && Date.now() - cacheTime < CACHE_TTL) return cachedNews;
 
   try {
-    const res = await fetch(
-      'https://news.google.com/rss/search?q=albion+online+update&hl=pt-BR&gl=BR&ceid=BR:pt-419',
-      { headers: { 'User-Agent': 'Mozilla/5.0' } }
-    );
-    const xml = await res.text();
-    cachedNews = parseRSS(xml).slice(0, 12);
+    const res = await fetch('https://albiononline.com/update', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'en-US,en;q=0.9'
+      }
+    });
+    const html = await res.text();
+    if (html.includes('Just a moment') || html.includes('cf-browser-verification')) {
+      console.error('[news] Cloudflare block');
+      return cachedNews || [];
+    }
+    const updates = parseUpdates(html);
+    const changelogs = parseChangelogs(html);
+    cachedNews = { updates, changelogs };
     cacheTime = Date.now();
     return cachedNews;
   } catch (err) {
     console.error('[news] erro ao buscar:', err.message);
-    return cachedNews || [];
+    return cachedNews || { updates: [], changelogs: [] };
   }
 }
 

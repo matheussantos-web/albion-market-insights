@@ -10,7 +10,7 @@ Router.register('/', async (app) => {
       { title: '', subtitle: '', cta: '' },
     ];
 
-    let news = [];
+    let news = { updates: [], changelogs: [] };
     try { news = await apiGet('/api/news'); } catch (e) {}
 
     app.innerHTML = `
@@ -38,24 +38,23 @@ Router.register('/', async (app) => {
 
         <div style="margin-bottom:2rem">
           <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;padding-bottom:0.5rem;border-bottom:1px solid var(--border)">
-            <span style="font-size:1.1rem">📰</span>
-            <h3 style="font-size:0.85rem;font-weight:700;color:var(--text)">Atualizações do Albion</h3>
-            <a href="https://albiononline.com/news" target="_blank" style="font-size:0.65rem;color:var(--text-dim);margin-left:auto">Ver tudo →</a>
+            <span style="font-size:1.1rem">🎮</span>
+            <h3 style="font-size:0.85rem;font-weight:700;color:var(--text)">Atualizações Oficiais</h3>
+            <a href="https://albiononline.com/update" target="_blank" style="font-size:0.65rem;color:var(--text-dim);margin-left:auto">Ver tudo →</a>
           </div>
-          ${news.length ? `
+          ${news.updates.length ? `
             <div class="news-featured">
-              <a href="${news[0].url}" target="_blank" class="news-card news-card-featured">
-                ${news[0].image ? `<div class="news-card-img news-card-img-lg"><img src="${news[0].image}" alt="${news[0].title}" loading="lazy" /></div>` : ''}
+              <a href="${news.updates[0].url}" target="_blank" class="news-card news-card-featured">
+                ${news.updates[0].image ? `<div class="news-card-img news-card-img-lg"><img src="${news.updates[0].image}" alt="${news.updates[0].title}" loading="lazy" /></div>` : ''}
                 <div class="news-card-body">
-                  <div class="news-card-source">${news[0].source}</div>
-                  <div class="news-card-title news-card-title-lg">${news[0].title}</div>
-                  <div class="news-card-desc">${news[0].description}</div>
-                  <div class="news-card-date">${news[0].date}</div>
+                  <div class="news-card-source">${news.updates[0].source}</div>
+                  <div class="news-card-title news-card-title-lg">${news.updates[0].title}</div>
+                  <div class="news-card-date">${news.updates[0].date}</div>
                 </div>
               </a>
             </div>
             <div class="news-grid">
-              ${news.slice(1, 7).map(n => `
+              ${news.updates.slice(1, 7).map(n => `
                 <a href="${n.url}" target="_blank" class="news-card">
                   ${n.image ? `<div class="news-card-img"><img src="${n.image}" alt="${n.title}" loading="lazy" /></div>` : ''}
                   <div class="news-card-body">
@@ -66,8 +65,26 @@ Router.register('/', async (app) => {
                 </a>
               `).join('')}
             </div>
-          ` : '<div style="text-align:center;color:var(--text-dim);font-size:0.8rem;padding:2rem">Carregando notícias...</div>'}
+          ` : '<div style="text-align:center;color:var(--text-dim);font-size:0.8rem;padding:2rem">Carregando atualizações...</div>'}
         </div>
+
+        ${news.changelogs.length ? `
+        <div style="margin-bottom:2rem">
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;padding-bottom:0.5rem;border-bottom:1px solid var(--border)">
+            <span style="font-size:1.1rem">📋</span>
+            <h3 style="font-size:0.85rem;font-weight:700;color:var(--text)">Changelogs Recentes</h3>
+            <a href="https://albiononline.com/update" target="_blank" style="font-size:0.65rem;color:var(--text-dim);margin-left:auto">Ver tudo →</a>
+          </div>
+          <div class="changelog-list">
+            ${news.changelogs.map(c => `
+              <a href="${c.url}" target="_blank" class="changelog-item">
+                <span class="changelog-title">${c.title}</span>
+                <span class="changelog-date">${c.date}</span>
+              </a>
+            `).join('')}
+          </div>
+        </div>
+        ` : ''}
 
       </div>
     `;
