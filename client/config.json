@@ -1,6 +1,7 @@
 {
   "server": "http://191.252.219.229:3000",
-  "apiKey": "COLE_SUA_API_KEY_AQUI",
-  "region": "west",
-  "proxyPort": 3456
+  "apiKey": "f8e4f2f0eee905921ac1e26b16dc7c86fabf37d0fda22217",
+  "name": "PC do Txaga",
+  "batchInterval": 5000,
+  "maxBatchSize": 100
 }
