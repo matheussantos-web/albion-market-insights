@@ -5,6 +5,14 @@ Router.register('/', async (app) => {
     const categories = await getCategories();
     const totalItems = categories.reduce((s, c) => s + c.count, 0);
 
+    const SLIDES = [
+      { title: '', subtitle: '', cta: '' },
+      { title: '', subtitle: '', cta: '' },
+      { title: '', subtitle: '', cta: '' },
+      { title: '', subtitle: '', cta: '' },
+      { title: '', subtitle: '', cta: '' },
+    ];
+
     const GROUPS = [
       { icon: '⚔', label: 'Armas Corpo a Corpo', cats: ['Espadas', 'Machados', 'Macas', 'Lancas', 'Martelos', 'Luvas de Guerra'] },
       { icon: '🏹', label: 'Armas a Distância', cats: ['Arcos', 'Bestas', 'Adagas'] },
@@ -21,15 +29,22 @@ Router.register('/', async (app) => {
     ];
 
     app.innerHTML = `
-      <div class="hero-banner">
-        <img src="/img/banner.png" alt="Albion Market Insights" />
-        <div class="hero-content">
-          <h1>ALBION <span class="gold">MARKET</span> INSIGHTS</h1>
-          <p>Painel de Análise do Mercado Albion Online</p>
-          <div class="hero-search-wrap">
-            <input type="text" class="input" id="homeSearch" placeholder="Buscar item (ex: espada, capuz, poção...)" style="width:100%;padding:0.7rem 1rem;font-size:0.85rem" autocomplete="off" />
-            <div class="search-results" id="homeSearchResults"></div>
-          </div>
+      <div class="carousel" id="carousel">
+        <div class="carousel-track" id="carouselTrack">
+          ${SLIDES.map((s, i) => `
+            <div class="carousel-slide">
+              <div class="carousel-slide-content">
+                ${s.title ? `<h2>${s.title}</h2>` : ''}
+                ${s.subtitle ? `<p>${s.subtitle}</p>` : ''}
+                ${s.cta ? `<a href="${s.cta.href}" class="btn btn-gold" style="margin-top:0.8rem">${s.cta.label}</a>` : ''}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <button class="carousel-btn carousel-prev" id="carouselPrev">‹</button>
+        <button class="carousel-btn carousel-next" id="carouselNext">›</button>
+        <div class="carousel-dots" id="carouselDots">
+          ${SLIDES.map((_, i) => `<span class="carousel-dot${i === 0 ? ' active' : ''}" data-slide="${i}"></span>`).join('')}
         </div>
       </div>
 
@@ -51,6 +66,17 @@ Router.register('/', async (app) => {
           <div class="stat-box">
             <div class="value">235</div>
             <div class="label">Watchlist AODP</div>
+          </div>
+        </div>
+
+        <div class="search-hero" style="margin-bottom:2rem">
+          <div style="text-align:center;margin-bottom:1rem">
+            <h3 style="font-size:0.9rem;font-weight:700;color:var(--text)">🔍 Buscar Item</h3>
+            <p style="font-size:0.7rem;color:var(--text-dim)">Pesquise por qualquer item do Albion Online</p>
+          </div>
+          <div style="position:relative;max-width:500px;margin:0 auto">
+            <input type="text" class="input" id="homeSearch" placeholder="Buscar item (ex: espada, capuz, poção...)" style="width:100%;padding:0.7rem 1rem;font-size:0.85rem" autocomplete="off" />
+            <div class="search-results" id="homeSearchResults"></div>
           </div>
         </div>
 
@@ -110,6 +136,27 @@ Router.register('/', async (app) => {
       </div>
     `;
 
+    let currentSlide = 0;
+    const totalSlides = SLIDES.length;
+    const track = document.getElementById('carouselTrack');
+    const dots = document.querySelectorAll('.carousel-dot');
+
+    function goToSlide(n) {
+      currentSlide = ((n % totalSlides) + totalSlides) % totalSlides;
+      track.style.transform = `translateX(-${currentSlide * 100}%)`;
+      dots.forEach((d, i) => d.classList.toggle('active', i === currentSlide));
+    }
+
+    document.getElementById('carouselPrev').addEventListener('click', () => goToSlide(currentSlide - 1));
+    document.getElementById('carouselNext').addEventListener('click', () => goToSlide(currentSlide + 1));
+    dots.forEach(d => d.addEventListener('click', () => goToSlide(parseInt(d.dataset.slide))));
+
+    let autoTimer = setInterval(() => goToSlide(currentSlide + 1), 5000);
+    document.getElementById('carousel').addEventListener('mouseenter', () => clearInterval(autoTimer));
+    document.getElementById('carousel').addEventListener('mouseleave', () => {
+      autoTimer = setInterval(() => goToSlide(currentSlide + 1), 5000);
+    });
+
     const homeSearch = document.getElementById('homeSearch');
     const homeResults = document.getElementById('homeSearchResults');
     let timeout;
@@ -144,7 +191,7 @@ Router.register('/', async (app) => {
     });
 
     document.addEventListener('click', (e) => {
-      if (!e.target.closest('.hero-search-wrap')) homeResults.classList.remove('active');
+      if (!e.target.closest('.search-hero')) homeResults.classList.remove('active');
     });
 
   } catch (e) {

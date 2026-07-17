@@ -59,3 +59,22 @@ CREATE TABLE IF NOT EXISTS contributors (
   created_at  TEXT DEFAULT (datetime('now')),
   last_seen_at TEXT
 );
+
+-- Usuários do sistema (login/registro)
+CREATE TABLE IF NOT EXISTS users (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  username      TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  display_name  TEXT,
+  role          TEXT DEFAULT 'user', -- 'user' | 'admin'
+  created_at    TEXT DEFAULT (datetime('now'))
+);
+
+-- Sessões ativas
+CREATE TABLE IF NOT EXISTS sessions (
+  token      TEXT PRIMARY KEY,
+  user_id    INTEGER NOT NULL,
+  created_at TEXT DEFAULT (datetime('now')),
+  expires_at TEXT NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);

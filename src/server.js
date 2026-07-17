@@ -10,6 +10,7 @@ const pricesRouter = require('./routes/prices');
 const ingestRouter = require('./routes/ingest');
 const adminRouter = require('./routes/admin');
 const syncRouter = require('./routes/sync');
+const authRouter = require('./routes/auth');
 
 init();
 
@@ -22,6 +23,7 @@ app.use('/api/prices', pricesRouter);
 app.use('/api/sync', syncRouter);
 app.use('/api/ingest', ingestRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/auth', authRouter);
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
