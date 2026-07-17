@@ -27,14 +27,28 @@ const INSERT_SQL = `
   )
 `;
 
+const SENTINELS = new Set([999999, 1000000, 9999999, 99999999, 2147483647, 0]);
+const MAX_PRICE = 50000000;
+
+function isSentinel(v) {
+  if (!v || v <= 0) return true;
+  if (SENTINELS.has(v)) return true;
+  if (v > MAX_PRICE) return true;
+  return false;
+}
+
 function buildInsertFn(db) {
   const getLocationId = db.prepare('SELECT id FROM locations WHERE name = ?');
   const insertPrice = db.prepare(INSERT_SQL);
 
   const insertMany = db.transaction((entries) => {
     let count = 0;
+    let rejected = 0;
     for (const row of entries) {
       if (!row.sell_price_min && !row.buy_price_min) continue;
+
+      if (isSentinel(row.sell_price_min)) { rejected++; continue; }
+
       const location = getLocationId.get(row.city);
       if (!location) continue;
       insertPrice.run({
@@ -42,13 +56,14 @@ function buildInsertFn(db) {
         location_id: location.id,
         quality: row.quality ?? 1,
         sell_price_min: row.sell_price_min || null,
-        sell_price_max: row.sell_price_max || null,
-        buy_price_min: row.buy_price_min || null,
-        buy_price_max: row.buy_price_max || null,
+        sell_price_max: isSentinel(row.sell_price_max) ? null : row.sell_price_max || null,
+        buy_price_min: isSentinel(row.buy_price_min) ? null : row.buy_price_min || null,
+        buy_price_max: isSentinel(row.buy_price_max) ? null : row.buy_price_max || null,
         observed_at: row.sell_price_min_date || row.buy_price_min_date || new Date().toISOString(),
       });
       count += 1;
     }
+    if (rejected > 0) console.log(`[publicSync] ${rejected} registros rejeitados (sentinel/default values)`);
     return count;
   });
 
