@@ -6,7 +6,7 @@ Router.register('/', async (app) => {
     const totalItems = categories.reduce((s, c) => s + c.count, 0);
 
     const SLIDES = [
-      { title: '', subtitle: '', cta: '' },
+      { img: '/img/slides/anuncie aqui.png', title: '', subtitle: '', cta: '' },
       { title: '', subtitle: '', cta: '' },
       { title: '', subtitle: '', cta: '' },
       { title: '', subtitle: '', cta: '' },
@@ -16,15 +16,16 @@ Router.register('/', async (app) => {
     app.innerHTML = `
       <div class="carousel" id="carousel">
         <div class="carousel-track" id="carouselTrack">
-          ${SLIDES.map((s, i) => `
-            <div class="carousel-slide">
-              <div class="carousel-slide-content">
-                ${s.title ? `<h2>${s.title}</h2>` : ''}
-                ${s.subtitle ? `<p>${s.subtitle}</p>` : ''}
-                ${s.cta ? `<a href="${s.cta.href}" class="btn btn-gold" style="margin-top:0.8rem">${s.cta.label}</a>` : ''}
+            ${SLIDES.map((s, i) => `
+              <div class="carousel-slide">
+                ${s.img ? `<img src="${s.img}" alt="Slide ${i+1}" style="width:100%;height:100%;object-fit:cover" />` : ''}
+                <div class="carousel-slide-content">
+                  ${s.title ? `<h2>${s.title}</h2>` : ''}
+                  ${s.subtitle ? `<p>${s.subtitle}</p>` : ''}
+                  ${s.cta ? `<a href="${s.cta.href}" class="btn btn-gold" style="margin-top:0.8rem">${s.cta.label}</a>` : ''}
+                </div>
               </div>
-            </div>
-          `).join('')}
+            `).join('')}
         </div>
         <button class="carousel-btn carousel-prev" id="carouselPrev">‹</button>
         <button class="carousel-btn carousel-next" id="carouselNext">›</button>
