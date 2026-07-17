@@ -2,41 +2,34 @@ const archiver = require('archiver');
 const fs = require('fs');
 const path = require('path');
 
-const distDir = path.join(__dirname, '..', 'dist');
+const clientDir = path.join(__dirname, '..');
+const distDir = path.join(clientDir, 'dist');
 const output = fs.createWriteStream(path.join(distDir, 'albion-insights-client.zip'));
 const archive = archiver('zip', { zlib: { level: 9 } });
 
 output.on('close', () => {
   console.log(`Pacote criado: ${archive.pointer()} bytes`);
+  console.log(`Arquivos:`);
+  archive.pointer(); // just for the close event
 });
 
 archive.pipe(output);
 
-// Add the exe
+// Client exe
 archive.file(path.join(distDir, 'albion-client.exe'), { name: 'albion-client.exe' });
 
-// Add config template
-archive.file(path.join(__dirname, '..', 'config.json'), { name: 'config.json' });
+// Npcap installer
+archive.file(path.join(distDir, 'npcap-1.88.exe'), { name: 'npcap-1.88.exe' });
 
-// Add instructions
-const instructions = `Albion Market Insights - Cliente
-================================
+// Config template
+archive.file(path.join(clientDir, 'config.json'), { name: 'config.json' });
 
-1. Instale o Npcap: https://npcap.com/#download
-   (marque "WinPcap API-compatible Mode")
+// Batch scripts
+archive.file(path.join(clientDir, 'INSTALAR.bat'), { name: 'INSTALAR.bat' });
+archive.file(path.join(clientDir, 'INICIAR.bat'), { name: 'INICIAR.bat' });
+archive.file(path.join(clientDir, 'CONFIGURAR.bat'), { name: 'CONFIGURAR.bat' });
 
-2. Edite config.json com sua API key
-
-3. Clique com botão direito em albion-client.exe
-   → "Executar como administrador"
-
-4. Abra o Albion Online e visite o mercado
-
-5. Os dados são enviados automaticamente!
-
-Obrigado por contribuir!
-`;
-
-archive.append(instructions, { name: 'LEIA-ME.txt' });
+// Instructions
+archive.file(path.join(clientDir, 'LEIA-ME.txt'), { name: 'LEIA-ME.txt' });
 
 archive.finalize();

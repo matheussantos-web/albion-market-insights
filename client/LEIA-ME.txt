@@ -1,60 +1,164 @@
-ALBION MARKET INSIGHTS - CLIENTE v2.0
-======================================
-
-O que e?
-  Cliente que captura dados de mercado do Albion Online
-  e envia pro servidor Albion Market Insights.
+===============================================
+ ALBION MARKET INSIGHTS - CLIENTE v2.0
+ Contribuicao com dados de mercado
+===============================================
 
 
-INSTALACAO (3 passos):
------------------------
-
-1. INSTALE O NPCAP
-   Baixe: https://npcap.com/#download
-   Marque: "WinPcap API-compatible Mode"
-   Reinicie o computador apos instalar
-
-2. CONFIGURE
-   Execute CONFIGURAR.bat
-   Digite seu nome e sua API Key
-   (pegue a API Key no painel do site)
-
-3. INICIE
-   Execute INICIAR.bat
-   IMPORTANTE: clique com botao direito →
-   "Executar como administrador"
+O QUE E?
+--------
+  Este programa captura os precos que voce ve
+  no mercado do Albion Online e envia pro
+  servidor da guild, ajudando todo mundo a
+  ter dados de mercado atualizados.
 
 
-COMO FUNCIONA:
---------------
-  1. Voce abre o Albion Online
-  2. Vai ate o mercado de qualquer cidade
-  3. Clica nos itens pra ver os precos
-  4. O cliente captura esses dados automaticamente
-  5. Envia pro servidor em lotes a cada 5 segundos
+COMO INSTALAR (passo a passo):
+------------------------------
+
+  PASSO 1 - DESCOMPACTAR
+  =======================
+  Descompacte este arquivo numa pasta.
+  Pode ser qualquer pasta, ex:
+    C:\Users\SeuNome\Documents\albion-client\
+
+
+  PASSO 2 - INSTALAR NPCAP
+  =========================
+  O Npcap e necessario para capturar os dados
+  de rede do jogo.
+
+  a) Execute o arquivo npcap-1.88.exe que vem
+     nesta pasta
+
+  b) Na tela de instalacao, MARQUE a opcao:
+     [x] WinPcap API-compatible Mode
+     (isso fica na ultima tela do instalador)
+
+  c) Clique em Install e aguarde
+
+  d) Se pedir pra reiniciar, reinicie o PC
+
+
+  PASSO 3 - CONFIGURAR
+  =====================
+  a) Execute o arquivo CONFIGURAR.bat
+     (clique com botao direito > Executar como
+     administrador)
+
+  b) Digite seu nome/gamertag
+
+  c) Digite sua API Key
+     (pegue no painel do site: Contributors)
+
+  d) Pronto! O config.json sera criado
+
+
+  PASSO 4 - INICIAR
+  ==================
+  a) Abra o Albion Online e entre no jogo
+
+  b) MINIMIZE o jogo (nao feche)
+
+  c) Execute INICIAR.bat
+     IMPORTANTE: clique com botao DIREITO >
+     "Executar como administrador"
+
+  d) Volte pro jogo e va ate o mercado
+
+  e) Clique nos itens pra ver os precos
+     (abra pelo menos 1 pagina de precos)
+
+  f) Os dados sao enviados automaticamente!
+
+
+COMO FUNCIONA POR DENTRO:
+-------------------------
+  1. O client ficar escutando os pacotes de rede
+     que o jogo envia/recebe (porta UDP 5056)
+
+  2. Quando voce abre o mercado no jogo, o client
+     captura os precos que o servidor manda
+
+  3. A cada 5 segundos, os dados capturados sao
+     enviados pro servidor em lotes
+
+  4. No servidor, os dados ficam disponiveis pra
+     todo mundo no site
+
+
+O QUE E ENVIADO?
+----------------
+  Apenas dados de mercado publicos:
+  - Item ID (ex: T4_BAG)
+  - Cidade (ex: Caerleon)
+  - Precos (sell/buy min/max)
+  - Qualidade do item
+  - Timestamp
+
+  NAO e enviado:
+  - Sua senha
+  - Seus itens
+  - Sua localizacao
+  - Qualquer dado pessoal
 
 
 REQUISITOS:
 ------------
-  - Windows 10/11 (64-bit)
-  - Npcap instalado
-  - Permissoes de administrador
+  - Windows 10 ou 11 (64-bit)
+  - Npcap instalado (WinPcap compat mode)
   - Internet ativa
+  - Permissoes de administrador
+  - Albion Online rodando
 
 
-TROUBLESHOOTING:
-----------------
-  "Npcap nao encontrado"
-    → Instale o Npcap de https://npcap.com
-    → Marque a opcao WinPcap compatible
+PROBLEMAS COMUNS:
+-----------------
 
-  "Sem permissoes"
-    → Clique com botao direito no INICIAR.bat
-    → Executar como administrador
+  "Nao consigo executar como administrador"
+    -> Clique com botao DIREITO no .bat
+    -> Selecione "Executar como administrador"
+    -> Nao e so dar duplo clique!
 
-  "API key invalida"
-    → Execute CONFIGURAR.bat e coloque sua key
-    → A key fica no painel do site (Contributors)
+  "O client abre e fecha rapido"
+    -> Provavelmente nao esta rodando como admin
+    -> Execute novamente como administrador
+
+  "ERRO: Npcap nao encontrado"
+    -> Instale o npcap-1.88.exe que esta na pasta
+    -> Marque "WinPcap API-compatible Mode"
+    -> Reinicie o PC depois de instalar
+
+  "ERRO: API key invalida"
+    -> Execute CONFIGURAR.bat
+    -> Cole sua API key corretamente
+    -> A key fica no painel do site
+
+  "Nao aparece nada no client"
+    -> Verifique se o Albion Online esta aberto
+    -> Va ate o mercado no jogo
+    -> Clique em alguns itens pra carregar precos
+
+  "O jogo trava com o client aberto"
+    -> O client nao interfere no jogo
+    -> Ele so le os pacotes de rede
+    -> Se travar, feche e reabra o client
 
 
-Obrigado por contribuir!
+ONDE BAIXAR:
+------------
+  https://github.com/matheussantos-web/albion-market-insights
+  Pasta: client/dist/
+
+
+TUTORIAL POR VIDEO:
+-------------------
+  (se disponivel, confira o canal da guild)
+
+
+OBRIGADO POR CONTRIBUIR!
+  Com seus dados, todo mundo da guild
+  consegue ver precos atualizados e
+  encontrar as melhores oportunidades
+  de mercado.
+
+===============================================
