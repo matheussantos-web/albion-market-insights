@@ -8,92 +8,51 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
 <body>
-  <header>
-    <div class="header-brand">
-      <h1>Albion Market Insights</h1>
-      <div class="subtitle">Dashboard privado de análise de mercado</div>
-    </div>
-    <div class="search-box">
-      <input type="text" id="searchInput" placeholder="Buscar item..." autocomplete="off" />
-      <div class="search-results" id="searchResults"></div>
-    </div>
-    <div class="header-actions">
-      <select id="cityFilter">
-        <option value="">Todas as cidades</option>
-        <option value="Caerleon">Caerleon</option>
-        <option value="Bridgewatch">Bridgewatch</option>
-        <option value="Lymhurst">Lymhurst</option>
-        <option value="Martlock">Martlock</option>
-        <option value="Fort Sterling">Fort Sterling</option>
-        <option value="Thetford">Thetford</option>
-        <option value="Black Market">Black Market</option>
-      </select>
-      <select id="sourceFilter">
-        <option value="">Todas as fontes</option>
-        <option value="private">Privado</option>
-        <option value="public_adp">AODP</option>
-      </select>
-      <button id="syncBtn" class="sync-btn" title="Sincronizar watchlist com AODP">Sync AODP</button>
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="#/" class="logo">
+        <span class="logo-icon">⚔</span>
+        <span class="logo-text">Albion <span class="gold">Market</span></span>
+      </a>
+      <nav class="main-nav" id="mainNav">
+        <a href="#/" class="nav-link" data-page="home">Home</a>
+        <a href="#/itens" class="nav-link" data-page="itens">Itens</a>
+        <a href="#/historico" class="nav-link" data-page="historico">Historico</a>
+        <a href="#/comparar" class="nav-link" data-page="comparar">Comparar</a>
+        <a href="#/craft" class="nav-link" data-page="craft">Craft</a>
+        <a href="#/contribuidores" class="nav-link" data-page="contribuidores">Contribuidores</a>
+      </nav>
+      <button class="mobile-menu-btn" id="mobileMenuBtn">☰</button>
     </div>
   </header>
 
-  <div class="layout">
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-header">
-        <h2>Categorias</h2>
+  <main id="app"></main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <span class="logo-icon">⚔</span>
+        <span>Albion Market Insights</span>
       </div>
-      <nav class="category-tree" id="categoryTree"></nav>
-    </aside>
-
-    <div class="main">
-      <div class="tier-bar" id="tierBar">
-        <span class="tier-label">Tier:</span>
-        <button data-tier="" class="active">Todos</button>
-        <button data-tier="3">T3</button>
-        <button data-tier="4">T4</button>
-        <button data-tier="5">T5</button>
-        <button data-tier="6">T6</button>
-        <button data-tier="7">T7</button>
-        <button data-tier="8">T8</button>
+      <div class="footer-links">
+        <a href="#/">Home</a>
+        <a href="#/itens">Itens</a>
+        <a href="#/historico">Historico</a>
+        <a href="#/comparar">Comparar</a>
+        <a href="#/craft">Craft</a>
       </div>
-
-      <div class="selected-info" id="selectedInfo" style="display:none">
-        <span class="selected-cat-label" id="selectedCatLabel"></span>
-        <button class="clear-filter" id="clearFilter">✕</button>
-      </div>
-
-      <div class="panels">
-        <div class="panel" id="latestPanel">
-          <h2>Preços Atuais</h2>
-          <div class="empty-state" id="latestEmpty">
-            <div class="icon">⚔</div>
-            <p>Selecione um item para ver os preços por cidade</p>
-          </div>
-          <div id="latestContent" style="display:none"></div>
-        </div>
-
-        <div class="panel" id="statsPanel">
-          <h2>Estatísticas</h2>
-          <div class="empty-state" id="statsEmpty">
-            <div class="icon">★</div>
-            <p>Estatísticas aparecem aqui ao selecionar um item</p>
-          </div>
-          <div id="statsContent" style="display:none"></div>
-        </div>
-
-        <div class="panel history-panel" id="historyPanel">
-          <h2>Histórico de Preços</h2>
-          <div class="empty-state" id="historyEmpty">
-            <div class="icon">❦</div>
-            <p>Gráfico do histórico de preços será exibido aqui</p>
-          </div>
-          <div id="historyContent" style="display:none"></div>
-        </div>
-      </div>
+      <div class="footer-copy">© 2026 Albion Market Insights · Dados da comunidade</div>
     </div>
-  </div>
+  </footer>
 
   <script src="/js/api.js"></script>
+  <script src="/js/router.js"></script>
+  <script src="/js/pages/home.js"></script>
+  <script src="/js/pages/itens.js"></script>
+  <script src="/js/pages/historico.js"></script>
+  <script src="/js/pages/comparar.js"></script>
+  <script src="/js/pages/craft.js"></script>
+  <script src="/js/pages/contribuidores.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>

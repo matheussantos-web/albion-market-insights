@@ -27,6 +27,38 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
+// GET /api/stats — estatísticas gerais para dashboard
+app.get('/api/stats', (req, res) => {
+  const { getDb } = require('./db/init');
+  const db = getDb();
+
+  const totalItems = db.prepare('SELECT COUNT(*) as c FROM items').get().c;
+  const totalPrices = db.prepare('SELECT COUNT(*) as c FROM market_prices').get().c;
+  const privatePrices = db.prepare("SELECT COUNT(*) as c FROM market_prices WHERE source = 'private'").get().c;
+  const publicPrices = db.prepare("SELECT COUNT(*) as c FROM market_prices WHERE source = 'public_adp'").get().c;
+  const activeContributors = db.prepare("SELECT COUNT(DISTINCT contributor_id) as c FROM market_prices WHERE source = 'private'").get().c;
+  const lastUpdate = db.prepare('SELECT MAX(observed_at) as t FROM market_prices').get().t;
+
+  res.json({ totalItems, totalPrices, privatePrices, publicPrices, activeContributors, lastUpdate });
+});
+
+// GET /api/contributors/stats — lista de contribuidores com contagem de registros
+app.get('/api/contributors/stats', (req, res) => {
+  const { getDb } = require('./db/init');
+  const db = getDb();
+
+  const rows = db.prepare(`
+    SELECT c.id, c.name as nickname, c.active, c.created_at, c.last_seen_at as last_seen,
+           COUNT(mp.id) as record_count
+    FROM contributors c
+    LEFT JOIN market_prices mp ON mp.contributor_id = c.id
+    GROUP BY c.id
+    ORDER BY record_count DESC
+  `).all();
+
+  res.json(rows);
+});
+
 app.listen(config.port, () => {
   console.log(`Albion Market Insights rodando em http://localhost:${config.port}`);
 });
