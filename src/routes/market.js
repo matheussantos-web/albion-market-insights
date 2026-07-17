@@ -50,7 +50,8 @@ router.get('/summary', (req, res) => {
     if (!pricePrev || pricePrev <= 0 || !priceNow || priceNow <= 0) continue;
 
     const rawDelta = ((priceNow - pricePrev) / pricePrev * 100);
-    const clampedDelta = Math.max(-MAX_DELTA, Math.min(MAX_DELTA, rawDelta));
+
+    if (Math.abs(rawDelta) > MAX_DELTA) continue;
 
     analysis.push({
       item: latest.item_unique_name,
@@ -60,41 +61,24 @@ router.get('/summary', (req, res) => {
       city: latest.city,
       price: priceNow,
       pricePrev,
-      delta: Math.round(clampedDelta * 100) / 100,
+      delta: Math.round(rawDelta * 100) / 100,
       volume: entries.length,
       observedAt: latest.observed_at
     });
   }
 
-  const usedItems = new Set();
-
-  const gainers = analysis
+  const gainers = [...analysis]
     .filter(a => a.delta > 0)
     .sort((a, b) => b.delta - a.delta)
-    .filter(a => {
-      if (usedItems.has(a.item)) return false;
-      usedItems.add(a.item);
-      return true;
-    })
     .slice(0, 5);
 
-  const losers = analysis
+  const losers = [...analysis]
     .filter(a => a.delta < 0)
     .sort((a, b) => a.delta - b.delta)
-    .filter(a => {
-      if (usedItems.has(a.item)) return false;
-      usedItems.add(a.item);
-      return true;
-    })
     .slice(0, 5);
 
   const mostTraded = [...analysis]
     .sort((a, b) => b.volume - a.volume)
-    .filter(a => {
-      if (usedItems.has(a.item)) return false;
-      usedItems.add(a.item);
-      return true;
-    })
     .slice(0, 5);
 
   res.json({ gainers, losers, mostTraded });
