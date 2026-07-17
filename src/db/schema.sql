@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS items (
   tier          INTEGER,
   enchantment   INTEGER DEFAULT 0,
   category      TEXT,
+  tradeable     INTEGER DEFAULT 1,
   updated_at    TEXT DEFAULT (datetime('now'))
 );
 

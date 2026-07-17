@@ -110,6 +110,12 @@ function parseCategory(uniqueName) {
   return 'Outros';
 }
 
+const NON_TRADEABLE_CATEGORIES = new Set(['Itens Unicos', 'Mobilha', 'Decoracao', 'Outros']);
+
+function isTradeable(category) {
+  return !NON_TRADEABLE_CATEGORIES.has(category);
+}
+
 async function run() {
   console.log(`[import:items] baixando ${config.itemsJsonUrl} ...`);
   const res = await fetch(config.itemsJsonUrl);
@@ -120,14 +126,15 @@ async function run() {
 
   const db = init();
   const upsert = db.prepare(`
-    INSERT INTO items (unique_name, name_ptbr, name_en, tier, enchantment, category)
-    VALUES (@unique_name, @name_ptbr, @name_en, @tier, @enchantment, @category)
+    INSERT INTO items (unique_name, name_ptbr, name_en, tier, enchantment, category, tradeable)
+    VALUES (@unique_name, @name_ptbr, @name_en, @tier, @enchantment, @category, @tradeable)
     ON CONFLICT(unique_name) DO UPDATE SET
       name_ptbr = excluded.name_ptbr,
       name_en = excluded.name_en,
       tier = excluded.tier,
       enchantment = excluded.enchantment,
       category = excluded.category,
+      tradeable = excluded.tradeable,
       updated_at = datetime('now')
   `);
 
@@ -144,6 +151,7 @@ async function run() {
         tier: parseTier(uniqueName),
         enchantment: parseEnchantment(uniqueName),
         category: parseCategory(uniqueName),
+        tradeable: isTradeable(parseCategory(uniqueName)) ? 1 : 0,
       });
       count += 1;
     }
