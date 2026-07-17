@@ -1,0 +1,26 @@
+{
+  "name": "albion-market-insights",
+  "version": "0.1.0",
+  "description": "Dashboard local de análise de mercado do Albion Online",
+  "main": "src/server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test tests/test.js",
+    "import:items": "node scripts/importItems.js",
+    "sync:public": "node scripts/syncPublic.js",
+    "db:init": "node -e \"require('./src/db/init').init()\""
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "morgan": "^1.10.0",
+    "node-fetch": "^2.7.0",
+    "uuid": "^9.0.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
