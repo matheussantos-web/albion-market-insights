@@ -57,10 +57,11 @@ Router.register('/flipper', async (app) => {
       params.set('premium', state.premium);
       if (state.category) params.set('category', state.category);
     } else {
-      params.set('mode', 'upgrade');
+      endpoint = '/api/flipper/upgrade';
       params.set('city', state.upgradeCity);
       params.set('tier', state.upgradeTier);
       params.set('minProfit', state.minProfit);
+      params.set('premium', state.premium);
     }
 
     try {
@@ -175,9 +176,9 @@ Router.register('/flipper', async (app) => {
 
   function renderUpgradeCard(o) {
     return `
-    <a href="#/itens?item=${encodeURIComponent(o.item_id)}" class="flipper-card" data-flip='${JSON.stringify({item_id:o.item_id,city:o.city,dest:`+${o.buy_enchant}→+${o.sell_enchant}`,profit:o.net_profit})}'>
+    <a href="#/itens?item=${encodeURIComponent(o.item_base)}" class="flipper-card" data-flip='${JSON.stringify({item_id:o.item_base,city:o.city,dest:`+${o.buy_enchant}→+${o.sell_enchant}`,profit:o.net_profit})}'>
       <div class="flipper-card-top">
-        <img src="${itemIcon(o.item_id)}" alt="" class="flipper-card-icon" loading="lazy" onerror="this.style.display='none'" />
+        <img src="${itemIcon(o.item_base)}" alt="" class="flipper-card-icon" loading="lazy" onerror="this.style.display='none'" />
         <div class="flipper-card-info">
           <div class="flipper-card-name">${o.item_name}</div>
           <div class="flipper-card-meta">
@@ -197,7 +198,7 @@ Router.register('/flipper', async (app) => {
         </div>
         <div class="flipper-price-row">
           <span class="flipper-price-label">Custo upgrade (${o.material_name})</span>
-          <span class="flipper-price-val flipper-price-tax">-${formatPrice(o.upgrade_cost)}</span>
+          <span class="flipper-price-val flipper-price-tax">-${formatPrice(o.upgrade_material_cost)}</span>
         </div>
         <div class="flipper-price-row">
           <span class="flipper-price-label">Venda +${o.sell_enchant}</span>
