@@ -13,39 +13,28 @@ Router.register('/', async (app) => {
       { title: '', subtitle: '', cta: '' },
     ];
 
-    const GROUPS = [
-      { icon: '⚔', label: 'Armas Corpo a Corpo', cats: ['Espadas', 'Machados', 'Macas', 'Lancas', 'Martelos', 'Luvas de Guerra'] },
-      { icon: '🏹', label: 'Armas a Distância', cats: ['Arcos', 'Bestas', 'Adagas'] },
-      { icon: '🔮', label: 'Cajados', cats: ['Cajados de Fogo', 'Cajados de Gelo', 'Cajados Sagrados', 'Cajados Arcanos', 'Cajados Amaldicoados', 'Cajados da Natureza'] },
-      { icon: '🛡', label: 'Off-hand & Defesa', cats: ['Escudos', 'Tochas', 'Livros', 'Chifres', 'Totens', 'Orbes', 'Runas', 'Pergaminhos'] },
-      { icon: '🪖', label: 'Armaduras de Placa', cats: ['Capacete de Placa', 'Armadura de Placa', 'Botas de Placa'] },
-      { icon: '🧥', label: 'Armaduras de Couro', cats: ['Capacete de Couro', 'Armadura de Couro', 'Botas de Couro'] },
-      { icon: '👘', label: 'Armaduras de Tecido', cats: ['Capacete de Tecido', 'Armadura de Tecido', 'Botas de Tecido'] },
-      { icon: '🎒', label: 'Acessórios & Outros', cats: ['Capas', 'Bolsas', 'Montarias'] },
-      { icon: '🧪', label: 'Consumíveis', cats: ['Pocoes', 'Comida', 'Pesca'] },
-      { icon: '⛏', label: 'Recursos Brutos', cats: ['Minerio', 'Madeira', 'Fibra', 'Couro Bruto', 'Pedra'] },
-      { icon: '🔨', label: 'Recursos Refinados', cats: ['Barra de Metal', 'Prancha', 'Tecido', 'Couro', 'Bloco de Pedra'] },
-      { icon: '🔧', label: 'Ferramentas & Outros', cats: ['Ferramentas', 'Gemas', 'Mobilha', 'Decoracao', 'Itens Unicos'] },
-    ];
-
     app.innerHTML = `
-      <div class="carousel" id="carousel">
-        <div class="carousel-track" id="carouselTrack">
-          ${SLIDES.map((s, i) => `
-            <div class="carousel-slide">
-              <div class="carousel-slide-content">
-                ${s.title ? `<h2>${s.title}</h2>` : ''}
-                ${s.subtitle ? `<p>${s.subtitle}</p>` : ''}
-                ${s.cta ? `<a href="${s.cta.href}" class="btn btn-gold" style="margin-top:0.8rem">${s.cta.label}</a>` : ''}
+      <div class="carousel-wrap">
+        <div class="carousel-ad-left">Publicidade</div>
+        <div class="carousel" id="carousel">
+          <div class="carousel-track" id="carouselTrack">
+            ${SLIDES.map((s, i) => `
+              <div class="carousel-slide">
+                <div class="carousel-slide-content">
+                  ${s.title ? `<h2>${s.title}</h2>` : ''}
+                  ${s.subtitle ? `<p>${s.subtitle}</p>` : ''}
+                  ${s.cta ? `<a href="${s.cta.href}" class="btn btn-gold" style="margin-top:0.8rem">${s.cta.label}</a>` : ''}
+                </div>
               </div>
-            </div>
-          `).join('')}
+            `).join('')}
+          </div>
+          <button class="carousel-btn carousel-prev" id="carouselPrev">‹</button>
+          <button class="carousel-btn carousel-next" id="carouselNext">›</button>
+          <div class="carousel-dots" id="carouselDots">
+            ${SLIDES.map((_, i) => `<span class="carousel-dot${i === 0 ? ' active' : ''}" data-slide="${i}"></span>`).join('')}
+          </div>
         </div>
-        <button class="carousel-btn carousel-prev" id="carouselPrev">‹</button>
-        <button class="carousel-btn carousel-next" id="carouselNext">›</button>
-        <div class="carousel-dots" id="carouselDots">
-          ${SLIDES.map((_, i) => `<span class="carousel-dot${i === 0 ? ' active' : ''}" data-slide="${i}"></span>`).join('')}
-        </div>
+        <div class="carousel-ad-right">Publicidade</div>
       </div>
 
       <div style="max-width:1200px;margin:0 auto;padding:0 1.5rem">
@@ -78,35 +67,6 @@ Router.register('/', async (app) => {
             <input type="text" class="input" id="homeSearch" placeholder="Buscar item (ex: espada, capuz, poção...)" style="width:100%;padding:0.7rem 1rem;font-size:0.85rem" autocomplete="off" />
             <div class="search-results" id="homeSearchResults"></div>
           </div>
-        </div>
-
-        <div style="margin-bottom:2rem">
-          <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;padding-bottom:0.5rem;border-bottom:1px solid var(--border)">
-            <span style="font-size:1.1rem">📊</span>
-            <h3 style="font-size:0.8rem;font-weight:700;color:var(--text)">Categorias de Itens</h3>
-          </div>
-          ${GROUPS.map(group => {
-            const groupCats = group.cats.map(c => categories.find(x => x.category === c)).filter(Boolean);
-            if (!groupCats.length) return '';
-            const totalCount = groupCats.reduce((s, c) => s + c.count, 0);
-            return `
-              <div class="cat-section">
-                <div class="cat-section-header">
-                  <span class="cat-section-icon">${group.icon}</span>
-                  <h3>${group.label}</h3>
-                  <span class="cat-section-count">${totalCount} itens</span>
-                </div>
-                <div class="cat-section-grid">
-                  ${groupCats.map(c => `
-                    <a href="#/itens?cat=${encodeURIComponent(c.category)}" class="highlight-card">
-                      <div class="hc-name">${c.category}</div>
-                      <div class="hc-meta">${c.count} itens</div>
-                    </a>
-                  `).join('')}
-                </div>
-              </div>
-            `;
-          }).join('')}
         </div>
 
         <div style="margin-bottom:2rem">
