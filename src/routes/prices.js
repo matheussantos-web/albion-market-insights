@@ -89,6 +89,12 @@ router.get('/:uniqueName/latest', (req, res) => {
   const rows = db.prepare(query).all(req.params.uniqueName);
   cache.set(cacheKey, rows);
   res.json(rows);
+
+  // fetch fresher data from AODP in background (non-blocking)
+  const { fetchItemFromAodp } = require('../services/publicSync');
+  fetchItemFromAodp(req.params.uniqueName).then(synced => {
+    if (synced > 0) cache.invalidate(req.params.uniqueName);
+  }).catch(() => {});
 });
 
 module.exports = router;
