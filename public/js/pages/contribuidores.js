@@ -1,6 +1,6 @@
 Router.register('/contribuidores', async (app) => {
   app.innerHTML = `
-    <div>
+    <div style="max-width:1200px;margin:0 auto;padding:1.5rem">
       <div style="display:flex;align-items:baseline;gap:0.75rem;margin-bottom:1rem;flex-wrap:wrap">
         <h2 style="font-size:1.1rem;font-weight:700">Contribuidores</h2>
         <span style="font-size:0.7rem;color:var(--text-dim)">Status dos colaboradores e dados coletados</span>

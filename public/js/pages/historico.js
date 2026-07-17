@@ -53,7 +53,7 @@ Router.register('/historico', async (app, itemId) => {
     const name = (itemInfo && itemInfo.name_ptbr) || (latest.length && latest[0].name_ptbr) || itemId;
 
     app.innerHTML = `
-      <div>
+      <div style="max-width:1200px;margin:0 auto;padding:1.5rem">
         <div style="display:flex;align-items:baseline;gap:0.75rem;margin-bottom:1rem;flex-wrap:wrap">
           <a href="#/itens" style="font-size:0.75rem;color:var(--text-dim)">← Voltar</a>
           <h2 style="font-size:1.1rem;font-weight:700">${name}</h2>
@@ -94,6 +94,7 @@ Router.register('/historico', async (app, itemId) => {
           <div class="chart-container"><canvas id="histChart"></canvas></div>
         </div>
       </div>
+    </div>
     `;
 
     if (history.length) {
