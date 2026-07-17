@@ -61,7 +61,6 @@ CREATE TABLE IF NOT EXISTS contributors (
   created_at  TEXT DEFAULT (datetime('now')),
   last_seen_at TEXT
 );
-CREATE INDEX IF NOT EXISTS idx_contributors_user ON contributors(user_id);
 
 -- Usuários do sistema (login/registro)
 CREATE TABLE IF NOT EXISTS users (
