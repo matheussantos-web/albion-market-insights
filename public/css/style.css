@@ -799,7 +799,17 @@ a:hover { color: var(--text); }
   border: 1px solid var(--border);
   border-radius: 8px;
 }
-.trend-label { font-size: 0.6rem; color: var(--text-dim); margin-bottom: 0.4rem; }
+.trend-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.trend-title { font-size: 0.72rem; font-weight: 700; color: var(--text); }
+.trend-scope { font-size: 0.55rem; color: var(--text-dim); }
+.trend-current { text-align: right; }
+.trend-value { font-size: 1rem; font-weight: 700; color: var(--gold); margin-right: 0.4rem; }
+.trend-change { font-size: 0.7rem; font-weight: 600; }
 .trend-svg-wrap { position: relative; }
 .trend-svg { width: 100%; height: 60px; }
 .trend-svg circle { cursor: pointer; transition: opacity 0.15s; }

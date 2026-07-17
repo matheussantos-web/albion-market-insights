@@ -44,7 +44,7 @@ Router.register('/', async (app) => {
 
     function renderMarketItem(item, color) {
       return `
-        <a href="#/itens?q=${encodeURIComponent(item.item)}" class="market-item">
+        <a href="#/itens?item=${encodeURIComponent(item.item)}" class="market-item">
           <div class="market-item-left">
             <img src="${itemIcon(item.item)}" alt="" class="market-item-icon" loading="lazy"
                  onerror="this.style.display='none'" />
@@ -99,6 +99,11 @@ Router.register('/', async (app) => {
       const min = Math.min(...prices);
       const max = Math.max(...prices);
       const range = max - min || 1;
+      const current = prices[prices.length - 1];
+      const first = prices[0];
+      const changePercent = first > 0 ? ((current - first) / first * 100) : 0;
+      const changeColor = changePercent >= 0 ? '#4ade80' : '#f87171';
+      const changeSign = changePercent >= 0 ? '+' : '';
       const w = 300;
       const h = 60;
       const step = w / (prices.length - 1 || 1);
@@ -107,7 +112,8 @@ Router.register('/', async (app) => {
       const circles = prices.map((p, i) => {
         const x = (i * step).toFixed(1);
         const y = (h - ((p - min) / range) * (h - 10) - 5).toFixed(1);
-        const label = trendData[i] ? `${trendData[i].hour}: ${Math.round(p).toLocaleString('pt-BR')}` : '';
+        const d = trendData[i];
+        const label = d ? `${d.hour} — ${Math.round(p).toLocaleString('pt-BR')} pts (${d.item_count} itens)` : '';
         return `<circle cx="${x}" cy="${y}" r="3" fill="var(--gold)" opacity="0"
           data-tip="${label}"
           onmouseover="this.setAttribute('opacity','1');var t=document.getElementById('chartTip');t.textContent=this.dataset.tip;t.style.display='block'"
@@ -115,17 +121,22 @@ Router.register('/', async (app) => {
         />`;
       }).join('');
 
+      const scope = selectedCity === 'Todas' ? 'Todas as cidades' : selectedCity;
+
       return `
         <div class="trend-chart">
-          <div class="trend-label">Índice de Preços — ${trendData.length} pontos</div>
+          <div class="trend-header">
+            <div>
+              <div class="trend-title">Índice de Preços</div>
+              <div class="trend-scope">${scope} · ${trendData.length} pontos</div>
+            </div>
+            <div class="trend-current">
+              <span class="trend-value">${Math.round(current).toLocaleString('pt-BR')}</span>
+              <span class="trend-change" style="color:${changeColor}">${changeSign}${changePercent.toFixed(1)}%</span>
+            </div>
+          </div>
           <div class="trend-svg-wrap">
             <svg viewBox="0 0 ${w} ${h}" class="trend-svg">
-              <defs>
-                <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stop-color="var(--gold)" stop-opacity="0.3"/>
-                  <stop offset="100%" stop-color="var(--gold)" stop-opacity="0"/>
-                </linearGradient>
-              </defs>
               <polyline fill="none" stroke="var(--gold)" stroke-width="1.5" stroke-linejoin="round" points="${points}"/>
               ${circles}
             </svg>

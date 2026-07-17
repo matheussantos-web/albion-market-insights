@@ -95,12 +95,15 @@ router.get('/trend', (req, res) => {
     SELECT
       strftime('%Y-%m-%d %H:00:00', mp.observed_at) AS hour,
       AVG(mp.sell_price_min) AS avg_price,
-      COUNT(DISTINCT mp.item_unique_name) AS item_count
+      COUNT(DISTINCT mp.item_unique_name) AS item_count,
+      COUNT(*) AS total_records
     FROM market_prices mp
     JOIN locations l ON l.id = mp.location_id
     WHERE mp.sell_price_min > 0
+      AND mp.sell_price_min < 50000000
       ${cityFilter}
     GROUP BY hour
+    HAVING total_records >= 3
     ORDER BY hour ASC
   `).all(...cityParams);
 

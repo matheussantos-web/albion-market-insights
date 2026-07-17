@@ -356,6 +356,15 @@ Router.register('/itens', async (app, params) => {
   renderTree();
   loadItems();
 
+  const searchQ = urlParams.get('q');
+  if (searchQ) {
+    const searchInput = document.getElementById('itemSearch');
+    if (searchInput) {
+      searchInput.value = searchQ;
+      searchInput.dispatchEvent(new Event('input'));
+    }
+  }
+
   if (urlParams.get('item')) {
     showItemDetail(urlParams.get('item'));
   }
