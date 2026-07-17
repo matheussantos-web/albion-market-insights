@@ -137,7 +137,7 @@ Router.register('/', async (app) => {
         homeResults.classList.add('active');
         homeResults.querySelectorAll('.sr-item[data-id]').forEach(el => {
           el.addEventListener('click', () => {
-            Router.navigate('/historico/' + el.dataset.id);
+            Router.navigate('/itens?item=' + el.dataset.id);
           });
         });
       }, 250);

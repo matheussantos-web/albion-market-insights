@@ -48,7 +48,7 @@ a:hover { color: var(--text); }
   padding: 0 1.5rem;
   display: flex;
   align-items: center;
-  height: 56px;
+  height: 60px;
   gap: 2rem;
 }
 .logo {
@@ -63,8 +63,8 @@ a:hover { color: var(--text); }
 }
 .logo:hover { color: var(--text); }
 .logo-img {
-  height: 36px;
-  width: 36px;
+  height: 42px;
+  width: auto;
   object-fit: contain;
   border-radius: 6px;
 }
@@ -128,8 +128,8 @@ a:hover { color: var(--text); }
   gap: 0.75rem;
 }
 .footer-logo {
-  height: 48px;
-  width: 48px;
+  height: 52px;
+  width: auto;
   object-fit: contain;
   border-radius: 8px;
   opacity: 0.8;
@@ -290,7 +290,7 @@ a:hover { color: var(--text); }
   width: 220px;
   flex-shrink: 0;
   position: sticky;
-  top: 65px;
+  top: 70px;
   height: fit-content;
   max-height: calc(100vh - 80px);
   overflow-y: auto;
@@ -616,7 +616,7 @@ a:hover { color: var(--text); }
   .main-nav { display: none; }
   .main-nav.open {
     display: flex; flex-direction: column;
-    position: absolute; top: 56px; left: 0; right: 0;
+    position: absolute; top: 60px; left: 0; right: 0;
     background: var(--surface); border-bottom: 1px solid var(--border);
     padding: 0.5rem; z-index: 99;
   }
