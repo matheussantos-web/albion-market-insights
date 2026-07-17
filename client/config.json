@@ -1,6 +1,6 @@
 {
-  "server": "http://SEU_SERVIDOR:3000",
-  "apiKey": "SUA_API_KEY_AQUI",
-  "region": "europe",
+  "server": "http://191.252.219.229:3000",
+  "apiKey": "COLE_SUA_API_KEY_AQUI",
+  "region": "west",
   "proxyPort": 3456
 }

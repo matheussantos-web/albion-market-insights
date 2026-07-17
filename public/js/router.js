@@ -17,7 +17,8 @@ const Router = {
 
   resolve() {
     const hash = window.location.hash.slice(1) || '/';
-    const [path, ...paramParts] = hash.split('/').filter(Boolean);
+    const hashPath = hash.split('?')[0];
+    const [path, ...paramParts] = hashPath.split('/').filter(Boolean);
     const route = '/' + (path || '');
 
     document.querySelectorAll('.nav-link').forEach(el => {
