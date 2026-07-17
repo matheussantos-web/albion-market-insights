@@ -30,6 +30,18 @@ Router.register('/', async (app) => {
       return `https://albiononline2d.b-cdn.net/thumbnail/80x80/${clean}.png`;
     }
 
+    function formatPrice(n) {
+      if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+      if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+      return n.toLocaleString('pt-BR');
+    }
+
+    function formatDelta(d) {
+      const sign = d > 0 ? '+' : '';
+      if (Math.abs(d) >= 100) return sign + Math.round(d) + '%';
+      return sign + d.toFixed(1) + '%';
+    }
+
     function renderMarketItem(item, color) {
       return `
         <a href="#/itens?q=${encodeURIComponent(item.item)}" class="market-item">
@@ -38,12 +50,12 @@ Router.register('/', async (app) => {
                  onerror="this.style.display='none'" />
             <div class="market-item-info">
               <div class="market-item-name">${item.name}</div>
-              <div class="market-item-city">${item.city} · T${item.tier || '?'}</div>
+              <div class="market-item-city">${item.city} · T${item.tier || '?'} · ${item.volume}x</div>
             </div>
           </div>
           <div class="market-item-right">
-            <div class="market-item-price">${item.price.toLocaleString('pt-BR')}银</div>
-            <div class="market-item-delta" style="color:${color}">${item.delta > 0 ? '+' : ''}${item.delta.toFixed(1)}%</div>
+            <div class="market-item-price">${formatPrice(item.price)}</div>
+            <div class="market-item-delta" style="color:${color}">${formatDelta(item.delta)}</div>
           </div>
         </a>`;
     }
@@ -92,18 +104,33 @@ Router.register('/', async (app) => {
       const step = w / (prices.length - 1 || 1);
       const points = prices.map((p, i) => `${(i * step).toFixed(1)},${(h - ((p - min) / range) * (h - 10) - 5).toFixed(1)}`).join(' ');
 
+      const circles = prices.map((p, i) => {
+        const x = (i * step).toFixed(1);
+        const y = (h - ((p - min) / range) * (h - 10) - 5).toFixed(1);
+        const label = trendData[i] ? `${trendData[i].hour}: ${Math.round(p).toLocaleString('pt-BR')}` : '';
+        return `<circle cx="${x}" cy="${y}" r="3" fill="var(--gold)" opacity="0"
+          data-tip="${label}"
+          onmouseover="this.setAttribute('opacity','1');var t=document.getElementById('chartTip');t.textContent=this.dataset.tip;t.style.display='block'"
+          onmouseout="this.setAttribute('opacity','0');document.getElementById('chartTip').style.display='none'"
+        />`;
+      }).join('');
+
       return `
         <div class="trend-chart">
-          <div class="trend-label">Índice de Preços (${trendData.length} pontos)</div>
-          <svg viewBox="0 0 ${w} ${h}" class="trend-svg">
-            <defs>
-              <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="var(--gold)" stop-opacity="0.3"/>
-                <stop offset="100%" stop-color="var(--gold)" stop-opacity="0"/>
-              </linearGradient>
-            </defs>
-            <polyline fill="none" stroke="var(--gold)" stroke-width="1.5" stroke-linejoin="round" points="${points}"/>
-          </svg>
+          <div class="trend-label">Índice de Preços — ${trendData.length} pontos</div>
+          <div class="trend-svg-wrap">
+            <svg viewBox="0 0 ${w} ${h}" class="trend-svg">
+              <defs>
+                <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="var(--gold)" stop-opacity="0.3"/>
+                  <stop offset="100%" stop-color="var(--gold)" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <polyline fill="none" stroke="var(--gold)" stroke-width="1.5" stroke-linejoin="round" points="${points}"/>
+              ${circles}
+            </svg>
+            <div class="chart-tooltip" id="chartTip"></div>
+          </div>
         </div>`;
     }
 
