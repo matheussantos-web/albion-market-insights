@@ -34,42 +34,60 @@ router.get('/compare', (req, res) => {
   res.json(db.prepare(query).all(item));
 });
 
-router.get('/:uniqueName', (req, res) => {
+// GET /api/prices/:uniqueName — histórico com fallback AODP síncrono
+router.get('/:uniqueName', async (req, res) => {
   const db = getDb();
   const { city, limit = 50, source } = req.query;
 
-  let query = `
-    SELECT
-      mp.id, i.name_ptbr, mp.item_unique_name, l.name AS city,
-      mp.quality, mp.sell_price_min, mp.sell_price_max,
-      mp.buy_price_min, mp.buy_price_max, mp.observed_at, mp.source
-    FROM market_prices mp
-    JOIN locations l ON l.id = mp.location_id
-    LEFT JOIN items i ON i.unique_name = mp.item_unique_name
-    WHERE mp.item_unique_name = ?
-      ${SENTINEL_FILTER}
-  `;
-  const params = [req.params.uniqueName];
+  function runQuery() {
+    let query = `
+      SELECT
+        mp.id, i.name_ptbr, mp.item_unique_name, l.name AS city,
+        mp.quality, mp.sell_price_min, mp.sell_price_max,
+        mp.buy_price_min, mp.buy_price_max, mp.observed_at, mp.source
+      FROM market_prices mp
+      JOIN locations l ON l.id = mp.location_id
+      LEFT JOIN items i ON i.unique_name = mp.item_unique_name
+      WHERE mp.item_unique_name = ?
+        ${SENTINEL_FILTER}
+    `;
+    const params = [req.params.uniqueName];
 
-  if (city) {
-    query += ' AND l.name = ?';
-    params.push(city);
+    if (city) {
+      query += ' AND l.name = ?';
+      params.push(city);
+    }
+    if (source) {
+      query += ' AND mp.source = ?';
+      params.push(source);
+    }
+
+    query += ' ORDER BY mp.observed_at DESC LIMIT ?';
+    params.push(Number(limit));
+
+    return db.prepare(query).all(...params);
   }
-  if (source) {
-    query += ' AND mp.source = ?';
-    params.push(source);
+
+  let rows = runQuery();
+
+  if (rows.length === 0) {
+    const { fetchItemFromAodp } = require('../services/publicSync');
+    try {
+      await fetchItemFromAodp(req.params.uniqueName);
+      rows = runQuery();
+    } catch (err) {
+      console.error(`[prices/history] fallback AODP falhou para ${req.params.uniqueName}: ${err.message}`);
+    }
   }
 
-  query += ' ORDER BY mp.observed_at DESC LIMIT ?';
-  params.push(Number(limit));
-
-  res.json(db.prepare(query).all(...params));
+  res.json(rows);
 });
 
-router.get('/:uniqueName/latest', (req, res) => {
+// GET /api/prices/:uniqueName/latest — preço atual com fallback AODP síncrono
+router.get('/:uniqueName/latest', async (req, res) => {
   const cacheKey = `${req.params.uniqueName}:latest`;
   const cached = cache.get(cacheKey);
-  if (cached) return res.json(cached);
+  if (cached && cached.length > 0) return res.json(cached);
 
   const db = getDb();
   const query = `
@@ -92,15 +110,20 @@ router.get('/:uniqueName/latest', (req, res) => {
     GROUP BY l.name
     ORDER BY mp.sell_price_min ASC
   `;
-  const rows = db.prepare(query).all(req.params.uniqueName);
+  let rows = db.prepare(query).all(req.params.uniqueName);
+
+  if (rows.length === 0) {
+    const { fetchItemFromAodp } = require('../services/publicSync');
+    try {
+      await fetchItemFromAodp(req.params.uniqueName);
+      rows = db.prepare(query).all(req.params.uniqueName);
+    } catch (err) {
+      console.error(`[prices/latest] fallback AODP falhou para ${req.params.uniqueName}: ${err.message}`);
+    }
+  }
+
   cache.set(cacheKey, rows);
   res.json(rows);
-
-  // fetch fresher data from AODP in background (non-blocking)
-  const { fetchItemFromAodp } = require('../services/publicSync');
-  fetchItemFromAodp(req.params.uniqueName).then(synced => {
-    if (synced > 0) cache.invalidate(req.params.uniqueName);
-  }).catch(() => {});
 });
 
 module.exports = router;
