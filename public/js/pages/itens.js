@@ -325,7 +325,7 @@ Router.register('/itens', async (app, params) => {
                 },
               },
               scales: {
-                x: { type: 'timeseries', time: { tooltipFormat: 'dd/MM/yyyy HH:mm' }, ticks: { color: '#8a8070', font: { size: 9 }, maxTicksLimit: 10 }, grid: { color: '#1e1e2a' } },
+                x: { type: 'time', time: { tooltipFormat: 'dd/MM/yyyy HH:mm', unit: 'hour' }, ticks: { color: '#8a8070', font: { size: 9 }, maxTicksLimit: 10 }, grid: { color: '#1e1e2a' } },
                 y: { ticks: { color: '#8a8070', font: { size: 9 }, callback: v => v?.toLocaleString('pt-BR') }, grid: { color: '#1e1e2a' } },
               },
             },
