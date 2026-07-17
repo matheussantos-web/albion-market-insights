@@ -8,9 +8,13 @@ function updateAuthUI() {
   if (token && userStr) {
     try {
       const user = JSON.parse(userStr);
+      const initial = (user.display_name || user.username).charAt(0).toUpperCase();
       authArea.innerHTML = `
-        <span class="auth-user">${user.display_name || user.username}</span>
-        <button class="auth-btn" id="logoutBtn">Sair</button>
+        <div class="auth-user-wrap">
+          <div class="auth-avatar">${initial}</div>
+          <span class="auth-user">${user.display_name || user.username}</span>
+        </div>
+        <button class="auth-btn auth-btn-logout" id="logoutBtn">Sair</button>
       `;
       document.getElementById('logoutBtn').addEventListener('click', async () => {
         try {

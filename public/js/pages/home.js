@@ -10,8 +10,102 @@ Router.register('/', async (app) => {
       { title: '', subtitle: '', cta: '' },
     ];
 
+    const CITIES = ['Todas', 'Caerleon', 'Martlock', 'Lymhurst', 'Bridgewatch', 'Fort Sterling', 'Thetford'];
+    let selectedCity = 'Todas';
+
+    let marketData = { gainers: [], losers: [], mostTraded: [] };
+    let trendData = [];
     let news = { updates: [], changelogs: [] };
-    try { news = await apiGet('/api/news'); } catch (e) {}
+
+    try {
+      [marketData, trendData, news] = await Promise.all([
+        apiGet('/api/market/summary'),
+        apiGet('/api/market/trend'),
+        apiGet('/api/news')
+      ]);
+    } catch (e) {}
+
+    function itemIcon(name) {
+      const clean = name.replace(/_/g, '.');
+      return `https://albiononline2d.b-cdn.net/thumbnail/80x80/${clean}.png`;
+    }
+
+    function renderMarketItem(item, color) {
+      return `
+        <a href="#/itens?q=${encodeURIComponent(item.item)}" class="market-item">
+          <div class="market-item-left">
+            <img src="${itemIcon(item.item)}" alt="" class="market-item-icon" loading="lazy"
+                 onerror="this.style.display='none'" />
+            <div class="market-item-info">
+              <div class="market-item-name">${item.name}</div>
+              <div class="market-item-city">${item.city} · T${item.tier || '?'}</div>
+            </div>
+          </div>
+          <div class="market-item-right">
+            <div class="market-item-price">${item.price.toLocaleString('pt-BR')}银</div>
+            <div class="market-item-delta" style="color:${color}">${item.delta > 0 ? '+' : ''}${item.delta.toFixed(1)}%</div>
+          </div>
+        </a>`;
+    }
+
+    function renderMarketSection() {
+      const g = marketData.gainers.length
+        ? marketData.gainers.map(i => renderMarketItem(i, '#4ade80')).join('')
+        : '<div class="market-empty">Sem dados suficientes</div>';
+      const l = marketData.losers.length
+        ? marketData.losers.map(i => renderMarketItem(i, '#f87171')).join('')
+        : '<div class="market-empty">Sem dados suficientes</div>';
+      const m = marketData.mostTraded.length
+        ? marketData.mostTraded.map(i => renderMarketItem(i, 'var(--text-dim)')).join('')
+        : '<div class="market-empty">Sem dados suficientes</div>';
+      return `
+        <div class="market-grid">
+          <div class="market-col">
+            <div class="market-col-header market-col-header--green">
+              <span>📈 Maiores Altas</span><span class="market-col-sub">24h</span>
+            </div>
+            <div class="market-col-body">${g}</div>
+          </div>
+          <div class="market-col">
+            <div class="market-col-header market-col-header--red">
+              <span>📉 Maiores Baixas</span><span class="market-col-sub">24h</span>
+            </div>
+            <div class="market-col-body">${l}</div>
+          </div>
+          <div class="market-col">
+            <div class="market-col-header market-col-header--blue">
+              <span>🔥 Mais Negociados</span><span class="market-col-sub">volume</span>
+            </div>
+            <div class="market-col-body">${m}</div>
+          </div>
+        </div>`;
+    }
+
+    function renderTrendChart() {
+      if (!trendData.length) return '<div class="market-empty">Sem dados de tendência</div>';
+      const prices = trendData.map(t => t.avg_price);
+      const min = Math.min(...prices);
+      const max = Math.max(...prices);
+      const range = max - min || 1;
+      const w = 300;
+      const h = 60;
+      const step = w / (prices.length - 1 || 1);
+      const points = prices.map((p, i) => `${(i * step).toFixed(1)},${(h - ((p - min) / range) * (h - 10) - 5).toFixed(1)}`).join(' ');
+
+      return `
+        <div class="trend-chart">
+          <div class="trend-label">Índice de Preços (${trendData.length} pontos)</div>
+          <svg viewBox="0 0 ${w} ${h}" class="trend-svg">
+            <defs>
+              <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="var(--gold)" stop-opacity="0.3"/>
+                <stop offset="100%" stop-color="var(--gold)" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <polyline fill="none" stroke="var(--gold)" stroke-width="1.5" stroke-linejoin="round" points="${points}"/>
+          </svg>
+        </div>`;
+    }
 
     app.innerHTML = `
       <div class="carousel" id="carousel">
@@ -35,6 +129,18 @@ Router.register('/', async (app) => {
       </div>
 
       <div style="max-width:1200px;margin:0 auto;padding:1.5rem">
+
+        <div class="market-section">
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.8rem;padding-bottom:0.5rem;border-bottom:1px solid var(--border)">
+            <span style="font-size:1.1rem">💹</span>
+            <h3 style="font-size:0.85rem;font-weight:700;color:var(--text)">Resumo de Mercado</h3>
+            <div class="city-selector" id="citySelector">
+              ${CITIES.map(c => `<button class="city-tab${c === selectedCity ? ' active' : ''}" data-city="${c}">${c}</button>`).join('')}
+            </div>
+          </div>
+          <div id="marketSummary">${renderMarketSection()}</div>
+          <div id="trendChart">${renderTrendChart()}</div>
+        </div>
 
         <div style="margin-bottom:2rem">
           <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;padding-bottom:0.5rem;border-bottom:1px solid var(--border)">
@@ -92,6 +198,23 @@ Router.register('/', async (app) => {
 
       </div>
     `;
+
+    document.querySelectorAll('.city-tab').forEach(tab => {
+      tab.addEventListener('click', async () => {
+        selectedCity = tab.dataset.city;
+        document.querySelectorAll('.city-tab').forEach(t => t.classList.toggle('active', t.dataset.city === selectedCity));
+        document.getElementById('marketSummary').innerHTML = '<div class="market-loading">Carregando...</div>';
+        const params = selectedCity === 'Todas' ? '' : `?city=${encodeURIComponent(selectedCity)}`;
+        try {
+          [marketData, trendData] = await Promise.all([
+            apiGet('/api/market/summary' + params),
+            apiGet('/api/market/trend' + params)
+          ]);
+        } catch (e) {}
+        document.getElementById('marketSummary').innerHTML = renderMarketSection();
+        document.getElementById('trendChart').innerHTML = renderTrendChart();
+      });
+    });
 
     let currentSlide = 0;
     const totalSlides = SLIDES.length;

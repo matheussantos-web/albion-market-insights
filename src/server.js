@@ -12,6 +12,7 @@ const adminRouter = require('./routes/admin');
 const syncRouter = require('./routes/sync');
 const authRouter = require('./routes/auth');
 const newsRouter = require('./routes/news');
+const marketRouter = require('./routes/market');
 
 init();
 
@@ -26,6 +27,7 @@ app.use('/api/ingest', ingestRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/news', newsRouter);
+app.use('/api/market', marketRouter);
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
