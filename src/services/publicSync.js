@@ -9,7 +9,7 @@ const REGIONS = {
 };
 
 const CITIES = [
-  'Caerleon', 'Bridgewatch', 'Lymhurst', 'Martlock', 'Fort Sterling', 'Thetford',
+  'Caerleon', 'Bridgewatch', 'Lymhurst', 'Martlock', 'Fort Sterling', 'Thetford', 'Black Market',
 ];
 
 const INSERT_SQL = `
