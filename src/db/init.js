@@ -24,8 +24,18 @@ function init() {
   const schemaPath = path.join(__dirname, 'schema.sql');
   const schema = fs.readFileSync(schemaPath, 'utf8');
   database.exec(schema);
+  runMigrations(database);
   console.log(`[db] schema aplicado em ${DB_PATH}`);
   return database;
+}
+
+function runMigrations(database) {
+  const cols = database.prepare("PRAGMA table_info(contributors)").all();
+  if (!cols.find(c => c.name === 'user_id')) {
+    database.exec('ALTER TABLE contributors ADD COLUMN user_id INTEGER');
+    database.exec('CREATE INDEX IF NOT EXISTS idx_contributors_user ON contributors(user_id)');
+    console.log('[db] migration: user_id added to contributors');
+  }
 }
 
 module.exports = { getDb, init };

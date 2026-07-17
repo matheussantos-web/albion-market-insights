@@ -1,5 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
+const { v4: uuidv4 } = require('uuid');
 const { getDb } = require('../db/init');
 
 const router = express.Router();
@@ -22,15 +23,27 @@ function generateToken() {
 
 function getUserFromRequest(req) {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
-  const token = authHeader.slice(7);
-  const db = getDb();
-  const session = db.prepare(`
-    SELECT s.user_id, u.username, u.display_name, u.role
-    FROM sessions s JOIN users u ON s.user_id = u.id
-    WHERE s.token = ? AND s.expires_at > datetime('now')
-  `).get(token);
-  return session || null;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.slice(7);
+    const db = getDb();
+    const session = db.prepare(`
+      SELECT s.user_id, u.username, u.display_name, u.role
+      FROM sessions s JOIN users u ON s.user_id = u.id
+      WHERE s.token = ? AND s.expires_at > datetime('now')
+    `).get(token);
+    return session || null;
+  }
+  const sessionToken = req.headers['x-session-token'];
+  if (sessionToken) {
+    const db = getDb();
+    const session = db.prepare(`
+      SELECT s.user_id, u.username, u.display_name, u.role
+      FROM sessions s JOIN users u ON s.user_id = u.id
+      WHERE s.token = ? AND s.expires_at > datetime('now')
+    `).get(sessionToken);
+    return session || null;
+  }
+  return null;
 }
 
 router.get('/me', (req, res) => {
@@ -54,9 +67,15 @@ router.post('/register', (req, res) => {
     username, password_hash, display_name || username
   );
 
+  const userId = result.lastInsertRowid;
+  const contributorId = uuidv4();
+  const apiKey = crypto.randomBytes(24).toString('hex');
+  db.prepare('INSERT INTO contributors (id, name, api_key, user_id) VALUES (?, ?, ?, ?)')
+    .run(contributorId, display_name || username, apiKey, userId);
+
   const token = generateToken();
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-  db.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)').run(token, result.lastInsertRowid, expiresAt);
+  db.prepare('INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)').run(token, userId, expiresAt);
 
   res.json({ ok: true, token, username, display_name: display_name || username });
 });
@@ -85,6 +104,19 @@ router.post('/logout', (req, res) => {
     getDb().prepare('DELETE FROM sessions WHERE token = ?').run(token);
   }
   res.json({ ok: true });
+});
+
+router.get('/contributor', (req, res) => {
+  const user = getUserFromRequest(req);
+  if (!user) return res.status(401).json({ error: 'Não autenticado' });
+
+  const db = getDb();
+  const contributor = db.prepare(
+    'SELECT id, name, api_key, active, created_at, last_seen_at FROM contributors WHERE user_id = ?'
+  ).get(user.user_id);
+
+  if (!contributor) return res.json({ has_contributor: false });
+  res.json({ has_contributor: true, ...contributor });
 });
 
 module.exports = router;

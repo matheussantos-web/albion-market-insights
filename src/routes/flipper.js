@@ -28,12 +28,21 @@ function isSentinel(v) {
 }
 
 function resolveContributorId(db, req) {
+  // Accept session token (from web) or x-api-key (from client)
   const token = req.header('x-session-token');
-  if (!token) return null;
-  const sess = db.prepare('SELECT user_id FROM sessions WHERE token = ? AND expires_at > datetime(\'now\')').get(token);
-  if (!sess) return null;
-  const contrib = db.prepare('SELECT id FROM contributors WHERE name = (SELECT username FROM users WHERE id = ?)').get(sess.user_id);
-  return contrib ? contrib.id : null;
+  if (token) {
+    const sess = db.prepare('SELECT user_id FROM sessions WHERE token = ? AND expires_at > datetime(\'now\')').get(token);
+    if (sess) {
+      const contrib = db.prepare('SELECT id FROM contributors WHERE user_id = ?').get(sess.user_id);
+      if (contrib) return contrib.id;
+    }
+  }
+  const apiKey = req.header('x-api-key');
+  if (apiKey) {
+    const contrib = db.prepare('SELECT id FROM contributors WHERE api_key = ? AND active = 1').get(apiKey);
+    if (contrib) return contrib.id;
+  }
+  return null;
 }
 
 // ─── GET /api/flipper ─── Black Market flips ───

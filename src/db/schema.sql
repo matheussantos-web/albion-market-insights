@@ -57,9 +57,11 @@ CREATE TABLE IF NOT EXISTS contributors (
   name        TEXT NOT NULL,
   api_key     TEXT UNIQUE NOT NULL,
   active      INTEGER DEFAULT 1,
+  user_id     INTEGER,            -- vincula ao usuarios
   created_at  TEXT DEFAULT (datetime('now')),
   last_seen_at TEXT
 );
+CREATE INDEX IF NOT EXISTS idx_contributors_user ON contributors(user_id);
 
 -- Usuários do sistema (login/registro)
 CREATE TABLE IF NOT EXISTS users (
