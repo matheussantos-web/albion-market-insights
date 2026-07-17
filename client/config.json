@@ -1,0 +1,6 @@
+{
+  "server": "http://SEU_SERVIDOR:3000",
+  "apiKey": "SUA_API_KEY_AQUI",
+  "region": "europe",
+  "proxyPort": 3456
+}

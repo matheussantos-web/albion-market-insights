@@ -1,0 +1,28 @@
+{
+  "name": "albion-insights-client",
+  "version": "1.0.0",
+  "description": "Cliente que envia dados de mercado do Albion pro servidor Albion Market Insights",
+  "main": "index.js",
+  "bin": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "build": "pkg . --target node18-win-x64 --output dist/albion-client.exe --compress GZip"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
+  },
+  "pkg": {
+    "assets": [],
+    "targets": [
+      "node18-win-x64"
+    ],
+    "outputPath": "dist"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

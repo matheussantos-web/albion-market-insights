@@ -1,6 +1,12 @@
 node_modules/
 data/*.db
 data/*.db-journal
+data/*.db-shm
+data/*.db-wal
 tests/test.db
+tests/test.db-shm
+tests/test.db-wal
 .env
 *.log
+client/dist/
+client/bin/

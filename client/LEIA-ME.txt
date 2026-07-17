@@ -1,0 +1,66 @@
+# Albion Market Insights - Cliente
+
+## Como usar
+
+### 1. Baixe os arquivos
+Baixe `albion-client.exe` e `config.json` para a mesma pasta.
+
+### 2. Configure
+Edite `config.json` com os dados que você recebeu do administrador:
+
+```json
+{
+  "server": "http://IP_DO_SERVIDOR:3000",
+  "apiKey": "SUA_API_KEY",
+  "region": "europe",
+  "proxyPort": 3456
+}
+```
+
+- **server**: URL do servidor Albion Market Insights
+- **apiKey**: chave de API que você recebeu
+- **region**: `europe`, `west` ou `east` (depende da sua região no jogo)
+- **proxyPort**: porta do proxy local (não mude se não souber)
+
+### 3. Baixe o albiondata-client
+O `albion-client.exe` precisa do `albiondata-client` pra ler os dados do jogo.
+
+Baixe em: https://github.com/broderickhyde/albiondata-client/releases
+
+Coloque o `albiondata-client.exe` na mesma pasta que o `albion-client.exe`.
+
+### 4. Execute
+Dê duplo-clique no `albion-client.exe` ou rode pelo terminal:
+
+```
+albion-client.exe
+```
+
+O programa vai:
+1. Iniciar o proxy local
+2. Iniciar o albiondata-client
+3. Enviar seus dados de mercado pro servidor automaticamente
+
+### 5. Jogue!
+Enquanto você joga Albion, os dados de preços são coletados e enviados pro servidor em tempo real.
+
+## Requisitos
+- Windows 10/11
+- Albion Online rodando
+- albiondata-client (link acima)
+
+## Solução de problemas
+
+**"config.json não encontrado"**
+- Certifique-se que `config.json` está na mesma pasta que o `.exe`
+
+**"albiondata-client não encontrado"**
+- Baixe o albiondata-client e coloque na mesma pasta
+
+**"servidor rejeitou"**
+- Verifique se a URL do servidor está correta
+- Verifique se sua API key é válida
+- Entre em contato com o administrador
+
+**Programa abre e fecha instantaneamente**
+- Abra o PowerShell/terminal, navegue até a pasta e rode `.\albion-client.exe` pra ver os erros
