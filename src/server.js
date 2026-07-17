@@ -61,4 +61,17 @@ app.get('/api/contributors/stats', (req, res) => {
 
 app.listen(config.port, () => {
   console.log(`Albion Market Insights rodando em http://localhost:${config.port}`);
+
+  const SYNC_INTERVAL = 30 * 60 * 1000;
+  async function autoSync() {
+    try {
+      const { syncPublicPrices } = require('./services/publicSync');
+      const result = await syncPublicPrices();
+      console.log(`[auto-sync] ${result.synced} registros sincronizados`);
+    } catch (err) {
+      console.error('[auto-sync] erro:', err.message);
+    }
+  }
+  setInterval(autoSync, SYNC_INTERVAL);
+  autoSync();
 });

@@ -22,7 +22,7 @@ async function syncPublicPrices({ region = config.publicSyncRegion } = {}) {
     return { synced: 0 };
   }
 
-  const itemIds = watchlist.map((w) => w.item_unique_name);
+  const BATCH_SIZE = 50;
   const getLocationId = db.prepare('SELECT id FROM locations WHERE name = ?');
   const insertPrice = db.prepare(`
     INSERT INTO market_prices
@@ -31,11 +31,6 @@ async function syncPublicPrices({ region = config.publicSyncRegion } = {}) {
     VALUES (@item_unique_name, @location_id, @quality, @sell_price_min, @sell_price_max,
             @buy_price_min, @buy_price_max, @observed_at, NULL, 'public_adp')
   `);
-
-  const url = `${base}/api/v2/stats/prices/${itemIds.join(',')}.json?locations=${CITIES.join(',')}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`AODP respondeu ${res.status} ${res.statusText}`);
-  const rows = await res.json();
 
   const insertMany = db.transaction((entries) => {
     let count = 0;
@@ -58,9 +53,29 @@ async function syncPublicPrices({ region = config.publicSyncRegion } = {}) {
     return count;
   });
 
-  const synced = insertMany(rows);
-  console.log(`[publicSync] ${synced} registros públicos sincronizados (${itemIds.length} itens, região ${region}).`);
-  return { synced };
+  let totalSynced = 0;
+  for (let i = 0; i < watchlist.length; i += BATCH_SIZE) {
+    const batch = watchlist.slice(i, i + BATCH_SIZE);
+    const itemIds = batch.map((w) => w.item_unique_name);
+    const url = `${base}/api/v2/stats/prices/${itemIds.join(',')}.json?locations=${CITIES.join(',')}`;
+
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        console.error(`[publicSync] batch ${i / BATCH_SIZE + 1}: AODP respondeu ${res.status}`);
+        continue;
+      }
+      const rows = await res.json();
+      totalSynced += insertMany(rows);
+    } catch (err) {
+      console.error(`[publicSync] batch ${i / BATCH_SIZE + 1}: ${err.message}`);
+    }
+
+    await new Promise(r => setTimeout(r, 200));
+  }
+
+  console.log(`[publicSync] ${totalSynced} registros públicos sincronizados (${watchlist.length} itens, região ${region}).`);
+  return { synced: totalSynced };
 }
 
 async function fetchItemFromAodp(itemId, { region = config.publicSyncRegion } = {}) {
