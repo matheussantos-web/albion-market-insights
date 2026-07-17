@@ -14,7 +14,7 @@ Router.register('/', async (app) => {
     try { news = await apiGet('/api/news'); } catch (e) {}
 
     app.innerHTML = `
-      <div class="carousel" id="carousel" style="margin:0 1.5rem">
+      <div class="carousel" id="carousel">
         <div class="carousel-track" id="carouselTrack">
           ${SLIDES.map((s, i) => `
             <div class="carousel-slide">
@@ -43,13 +43,24 @@ Router.register('/', async (app) => {
             <a href="https://albiononline.com/news" target="_blank" style="font-size:0.65rem;color:var(--text-dim);margin-left:auto">Ver tudo →</a>
           </div>
           ${news.length ? `
+            <div class="news-featured">
+              <a href="${news[0].url}" target="_blank" class="news-card news-card-featured">
+                ${news[0].image ? `<div class="news-card-img news-card-img-lg"><img src="${news[0].image}" alt="${news[0].title}" loading="lazy" /></div>` : ''}
+                <div class="news-card-body">
+                  <div class="news-card-source">${news[0].source}</div>
+                  <div class="news-card-title news-card-title-lg">${news[0].title}</div>
+                  <div class="news-card-desc">${news[0].description}</div>
+                  <div class="news-card-date">${news[0].date}</div>
+                </div>
+              </a>
+            </div>
             <div class="news-grid">
-              ${news.map(n => `
+              ${news.slice(1, 7).map(n => `
                 <a href="${n.url}" target="_blank" class="news-card">
                   ${n.image ? `<div class="news-card-img"><img src="${n.image}" alt="${n.title}" loading="lazy" /></div>` : ''}
                   <div class="news-card-body">
+                    <div class="news-card-source">${n.source}</div>
                     <div class="news-card-title">${n.title}</div>
-                    <div class="news-card-desc">${n.description}</div>
                     <div class="news-card-date">${n.date}</div>
                   </div>
                 </a>
