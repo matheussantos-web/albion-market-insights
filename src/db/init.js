@@ -39,7 +39,7 @@ function runMigrations(database) {
 
   // Migration: remove FK on item_unique_name to accept any item ID from game
   const fks = database.prepare("PRAGMA foreign_key_list(market_prices)").all();
-  const hasItemFk = fks.some(f => f.from_column === 'item_unique_name');
+  const hasItemFk = fks.some(f => f.from === 'item_unique_name');
   if (hasItemFk) {
     console.log('[db] migration: removing FK on market_prices.item_unique_name...');
     database.pragma('foreign_keys = OFF');
