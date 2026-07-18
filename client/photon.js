@@ -1,7 +1,9 @@
 /**
  * Photon Protocol18 decoder for Albion Online market data.
- * Albion Online switched to Protocol18 (post-Radiant Wilds patch).
- * Only decodes enough to identify auction operations and extract item listings.
+ * Architecture based on AODP source analysis:
+ *   - Market data comes as JSON strings in the OperationResponse "debug message" slot
+ *   - Operation codes live in params[253], event codes in params[252]
+ *   - When debug message is a string[] (type 71), there is NO parameter table after it
  */
 
 class PhotonStream {
@@ -118,7 +120,7 @@ function zigZagDecode64(value) {
   return (value >> 1n) ^ -(value & 1n);
 }
 
-// Protocol18 type codes (Albion Online uses Protocol18 post-Radiant Wilds)
+// Protocol18 type codes
 const TYPE = {
   UNKNOWN:            0,
   BOOLEAN:            2,
@@ -152,6 +154,7 @@ const TYPE = {
   DOUBLE_ZERO:        33,
   BYTE_ZERO:          34,
   ARRAY:              64,
+  INT_ARRAY:          65,
   BOOLEAN_ARRAY:      66,
   BYTE_ARRAY:         67,
   SHORT_ARRAY:        68,
@@ -160,16 +163,20 @@ const TYPE = {
   STRING_ARRAY:       71,
   COMPRESSED_INT_ARRAY:  73,
   COMPRESSED_LONG_ARRAY: 74,
+  OBJECT_ARRAY_ARRAY: 82,
   CUSTOM_TYPE_ARRAY:  83,
   DICTIONARY_ARRAY:   84,
   HASHTABLE_ARRAY:    85,
   CUSTOM_TYPE_SLIM:   128,
 };
 
-// Auction operation codes we care about
-const AUCTION_OPS = new Set([75, 76, 89, 90]);
-// MarketPlaceNotification event code
-const MARKET_EVENT = 181;
+// ── Albion operation/event codes (from AODP source) ──
+// Market auction operations — codes found in params[253]
+const AUCTION_OPS = new Set([81, 82, 83, 95, 174, 176, 250]);
+// Join response (location tracking)
+const JOIN_OP = 2;
+// MarketPlaceNotification event code — found in params[252]
+const MARKET_EVENT = 183;
 
 const SENTINELS = new Set([999999, 1000000, 9999999, 99999999, 2147483647, 0]);
 const MAX_PRICE = 50000000;
@@ -181,6 +188,32 @@ function isSentinel(v) {
   return false;
 }
 
+// ── Location tracking ──
+const LOCATION_NAMES = {
+  3003: 'Brecilien',
+  3004: 'Caerleon',
+  3005: 'Bridgewatch',
+  3006: 'Fort Sterling',
+  3007: 'Lymhurst',
+  3008: 'Martlock',
+  3009: 'Thetford',
+  499:  'Black Market',
+};
+
+let _currentLocationId = 3004; // default Caerleon
+let _currentLocationName = 'Caerleon';
+
+function getCurrentLocation() {
+  return { id: _currentLocationId, name: _currentLocationName };
+}
+
+function setLocation(locationId) {
+  if (typeof locationId !== 'number') locationId = Number(locationId);
+  if (!locationId || locationId <= 0) return;
+  _currentLocationId = locationId;
+  _currentLocationName = LOCATION_NAMES[locationId] || `City(${locationId})`;
+}
+
 /**
  * Decode a value from the stream given its Protocol18 type code.
  * Returns [value, success]. On failure, returns [null, false].
@@ -188,7 +221,6 @@ function isSentinel(v) {
 function decodeValue(stream, typeCode) {
   try {
     switch (typeCode) {
-      // Zero/null/unknown shortcuts
       case TYPE.UNKNOWN:
       case TYPE.NULL:
         return [null, true];
@@ -209,7 +241,6 @@ function decodeValue(stream, typeCode) {
       case TYPE.BYTE_ZERO:
         return [0, true];
 
-      // Primitive types
       case TYPE.BYTE:
         return [stream.readByte(), true];
       case TYPE.BOOLEAN:
@@ -223,7 +254,6 @@ function decodeValue(stream, typeCode) {
       case TYPE.STRING:
         return [stream.readString(), true];
 
-      // Compressed integers (varint + ZigZag)
       case TYPE.COMPRESSED_INT: {
         const raw = stream.readVarint32();
         return [zigZagDecode32(raw), true];
@@ -233,7 +263,6 @@ function decodeValue(stream, typeCode) {
         return [Number(zigZagDecode64(raw)), true];
       }
 
-      // Compact integer encodings
       case TYPE.INT1:
         return [stream.readByte(), true];
       case TYPE.INT1_NEG:
@@ -251,7 +280,6 @@ function decodeValue(stream, typeCode) {
       case TYPE.LONG2_NEG:
         return [-stream.readUint16LE(), true];
 
-      // Custom type (19): typeId(byte) + varint32 length + data
       case TYPE.CUSTOM: {
         const typeId = stream.readByte();
         const len = stream.readVarint32();
@@ -259,7 +287,6 @@ function decodeValue(stream, typeCode) {
         return [{ custom: true, typeId, data: Array.from(data) }, true];
       }
 
-      // Container types
       case TYPE.HASHTABLE:
         return decodeHashtable(stream);
       case TYPE.DICTIONARY:
@@ -268,13 +295,12 @@ function decodeValue(stream, typeCode) {
       case TYPE.ARRAY:
         return decodeObjectArray(stream);
 
-      // Typed array types
+      case TYPE.INT_ARRAY:
+        return decodeIntArray(stream);
       case TYPE.BYTE_ARRAY:
         return decodeByteArray(stream);
       case TYPE.SHORT_ARRAY:
         return decodeShortArray(stream);
-      case TYPE.INT_ARRAY:
-        return decodeIntArray(stream);
       case TYPE.FLOAT_ARRAY:
         return decodeFloatArray(stream);
       case TYPE.DOUBLE_ARRAY:
@@ -293,6 +319,8 @@ function decodeValue(stream, typeCode) {
         return decodeDictionaryArray(stream);
       case TYPE.CUSTOM_TYPE_ARRAY:
         return decodeCustomTypeArray(stream);
+      case TYPE.OBJECT_ARRAY_ARRAY:
+        return decodeObjectArrayArray(stream);
 
       default:
         if (typeCode >= TYPE.CUSTOM_TYPE_SLIM) {
@@ -322,6 +350,15 @@ function decodeObjectArray(stream) {
   return [arr, true];
 }
 
+function decodeIntArray(stream) {
+  const size = stream.readVarint32();
+  const arr = [];
+  for (let i = 0; i < size; i++) {
+    arr.push(stream.readInt32());
+  }
+  return [arr, true];
+}
+
 function decodeByteArray(stream) {
   const size = stream.readVarint32();
   return [stream.readBytes(size), true];
@@ -332,15 +369,6 @@ function decodeShortArray(stream) {
   const arr = [];
   for (let i = 0; i < size; i++) {
     arr.push(stream.readInt16LE());
-  }
-  return [arr, true];
-}
-
-function decodeIntArray(stream) {
-  const size = stream.readVarint32();
-  const arr = [];
-  for (let i = 0; i < size; i++) {
-    arr.push(stream.readInt32());
   }
   return [arr, true];
 }
@@ -468,8 +496,17 @@ function decodeCustomTypeArray(stream) {
   return [arr, true];
 }
 
-// ── Protocol18 parameter table ──
-// Count is 1 byte (not 2 like P16)
+function decodeObjectArrayArray(stream) {
+  const size = stream.readVarint32();
+  const arr = [];
+  for (let i = 0; i < size; i++) {
+    const [v] = decodeValue(stream, TYPE.OBJECT_ARRAY);
+    arr.push(v);
+  }
+  return [arr, true];
+}
+
+// ── Protocol18 parameter table (1-byte count) ──
 
 function decodeParameterTable(stream) {
   const count = stream.readByte();
@@ -484,20 +521,35 @@ function decodeParameterTable(stream) {
   return params;
 }
 
+// ── Event decoding ──
+
 function decodeEvent(stream) {
   const code = stream.readByte();
   const params = decodeParameterTable(stream);
   return { code, params };
 }
 
-// P18 OperationResponse: opCode(1) + returnCode(int16 LE) + debugMessage(typed) + paramTable
+// ── OperationResponse decoding (AODP architecture) ──
+// opCode(1) + returnCode(int16 LE) + debugType(byte) + debugValue
+// If debugValue is string[] (type 71): market data — NO param table follows
+// Otherwise: read param table normally
+
 function decodeOperationResponse(stream) {
   const opCode = stream.readByte();
   const returnCode = stream.readInt16LE();
   const debugType = stream.readByte();
-  const [debugMsg] = decodeValue(stream, debugType);
+  const [debugMsg, debugOk] = decodeValue(stream, debugType);
+
+  // AODP: when debug message is a string array, it IS the market data
+  // and there is no parameter table after it
+  if (debugOk && Array.isArray(debugMsg) && debugMsg.length > 0 &&
+      typeof debugMsg[0] === 'string') {
+    return { opCode, returnCode, debugMsg, params: {}, isMarketData: true };
+  }
+
+  // Otherwise: read parameter table normally
   const params = decodeParameterTable(stream);
-  return { opCode, returnCode, debugMsg, params };
+  return { opCode, returnCode, debugMsg, params, isMarketData: false };
 }
 
 let _debug = false;
@@ -511,16 +563,19 @@ function decodeMessage(msgPayload) {
   if (msgPayload.remaining() < 2) return null;
   msgPayload.skip(1); // padding/signifier byte
   const rawMsgType = msgPayload.readByte();
-  const msgType = rawMsgType & 0x7F; // mask off flag bits (0x80 = encryption/compression flag)
-  const hasFlag = (rawMsgType & 0x80) !== 0;
+  const msgType = rawMsgType & 0x7F;
 
   if (msgType === 3) {
-    return { type: 'opResponse', data: decodeOperationResponse(msgPayload), hasFlag };
+    return { type: 'opResponse', data: decodeOperationResponse(msgPayload) };
   } else if (msgType === 4) {
-    return { type: 'event', data: decodeEvent(msgPayload), hasFlag };
+    return { type: 'event', data: decodeEvent(msgPayload) };
   }
-  dbg(`    unknown rawMsgType=${rawMsgType} (msgType=${msgType}, flag=${hasFlag})`);
   return null;
+}
+
+// ── Location name mapping ──
+function getLocationName(id) {
+  return LOCATION_NAMES[id] || `City(${id})`;
 }
 
 function handleMessage(msg, results) {
@@ -528,39 +583,152 @@ function handleMessage(msg, results) {
 
   if (msg.type === 'opResponse') {
     const resp = msg.data;
-    const paramKeys = Object.keys(resp.params);
-    dbg(`    opResponse: code=${resp.opCode} returnCode=${resp.returnCode} params(${paramKeys.length})=[${paramKeys.join(',')}]`);
-    if (paramKeys.length > 0) {
-      dbg(`    opResponse detail: ${JSON.stringify(resp.params).substring(0, 500)}`);
+
+    // Extract the REAL Albion opCode from params[253]
+    const albionOpCode = resp.params[253] !== undefined ? resp.params[253] : resp.opCode;
+
+    // Location tracking: Join response opCode=2 has locationId in params[8]
+    if (resp.opCode === JOIN_OP || albionOpCode === JOIN_OP) {
+      const locId = resp.params[8];
+      if (locId) {
+        setLocation(locId);
+        dbg(`    >>> JOIN: location=${_currentLocationName} (${_currentLocationId})`);
+      }
     }
-    if (AUCTION_OPS.has(resp.opCode)) {
-      dbg(`    >>> AUCTION OP ${resp.opCode}! Extracting data...`);
-      extractAuctionData(resp.params, results);
+
+    dbg(`    opResponse: header=${resp.opCode} albion=${albionOpCode} returnCode=${resp.returnCode} isMarket=${resp.isMarketData}`);
+
+    // Market data in debug message slot (string[] of JSON orders)
+    if (resp.isMarketData && resp.debugMsg && resp.debugMsg.length > 0) {
+      dbg(`    >>> MARKET DATA (debug slot): ${resp.debugMsg.length} items, opCode=${albionOpCode}`);
+      extractMarketOrders(resp.debugMsg, albionOpCode, results);
+      return;
     }
+
+    // Auction operations via params[253]
+    if (AUCTION_OPS.has(albionOpCode)) {
+      dbg(`    >>> AUCTION OP ${albionOpCode}! params keys: [${Object.keys(resp.params).join(',')}]`);
+      extractAuctionData(resp.params, albionOpCode, results);
+    }
+
   } else if (msg.type === 'event') {
     const evt = msg.data;
-    const paramKeys = Object.keys(evt.params);
-    const albionCode = evt.params[252];
-    dbg(`    event: code=${evt.code} albion=${albionCode} n=${paramKeys.length} keys=[${paramKeys.join(',')}]`);
-    if (paramKeys.length > 0 && evt.code !== 3) {
-      const preview = JSON.stringify(evt.params, (k, v) => {
-        if (v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length > 8) {
-          return `{${Object.keys(v).length} keys}`;
-        }
-        return v;
-      }).substring(0, 600);
-      dbg(`    event detail: ${preview}`);
+
+    // Extract the REAL Albion event code from params[252]
+    const albionCode = evt.params[252] !== undefined ? evt.params[252] : evt.code;
+
+    dbg(`    event: header=${evt.code} albion=${albionCode} n=${Object.keys(evt.params).length}`);
+
+    if (albionCode === MARKET_EVENT) {
+      dbg(`    >>> MARKET EVENT ${albionCode}! params keys: [${Object.keys(evt.params).join(',')}]`);
+      extractAuctionData(evt.params, albionCode, results);
     }
-    if (evt.code === MARKET_EVENT) {
-      dbg(`    >>> MARKET EVENT ${evt.code}! Extracting data...`);
-      extractAuctionData(evt.params, results);
+  }
+}
+
+// ── Parse JSON market orders from debug slot ──
+// Each string in the array is a JSON-encoded market order:
+// {Id, ItemTypeId, ItemGroupTypeId, LocationId, QualityLevel,
+//  EnchantmentLevel, UnitPriceSilver, Amount, AuctionType, Expires}
+
+function extractMarketOrders(stringArray, opCode, results) {
+  const loc = getCurrentLocation();
+  let parsed = 0;
+  let failed = 0;
+
+  for (const raw of stringArray) {
+    if (typeof raw !== 'string') continue;
+    try {
+      const order = JSON.parse(raw);
+
+      const itemId = order.ItemTypeId;
+      const price = order.UnitPriceSilver;
+      const quality = order.QualityLevel || 1;
+      const enchant = order.EnchantmentLevel || 0;
+      const amount = order.Amount || 1;
+      const auctionType = order.AuctionType || 'offer';
+      const locationId = order.LocationId;
+      const expires = order.Expires;
+
+      if (!itemId || !price || isSentinel(price)) continue;
+
+      // Strip enchantment suffix from item ID (e.g. "T4_BAG@3" -> "T4_BAG")
+      const cleanItemId = itemId.replace(/@\d+$/, '');
+
+      results.push({
+        itemId: cleanItemId,
+        quality,
+        price: Number(price),
+        amount,
+        auctionType,
+        locationId: locationId || loc.id,
+        locationName: getLocationName(locationId || loc.id),
+        enchant,
+        expires,
+        source: 'market_json',
+        opCode,
+      });
+      parsed++;
+    } catch (e) {
+      failed++;
+    }
+  }
+
+  if (parsed > 0 || failed > 0) {
+    dbg(`    market orders: ${parsed} parsed, ${failed} failed, city=${_currentLocationName}`);
+  }
+}
+
+// ── Fallback: extract from params hashtable (older format) ──
+
+function extractAuctionData(params, opCode, results) {
+  for (const key of Object.keys(params)) {
+    const val = params[key];
+    if (!Array.isArray(val)) continue;
+
+    for (const entry of val) {
+      if (!entry || typeof entry !== 'object') continue;
+
+      let itemId = entry.itemTypeId || entry.ItemTypeId || entry.itemId;
+      let price = entry.unitPrice || entry.UnitPriceSilver || entry.price;
+      let quality = entry.quality || entry.QualityLevel || 1;
+      let auctionType = entry.auctionType || entry.AuctionType || 'offer';
+      let amount = entry.amount || entry.Amount || 1;
+
+      if (!itemId) {
+        for (const k of Object.keys(entry)) {
+          const v = entry[k];
+          if (typeof v === 'string' && /^T[1-8]_/.test(v)) { itemId = v; break; }
+        }
+      }
+      if (!price) {
+        for (const k of Object.keys(entry)) {
+          const v = entry[k];
+          if (typeof v === 'number' && !isSentinel(v) && v >= 100) { price = v; break; }
+        }
+      }
+
+      if (itemId && typeof itemId === 'string' && price && !isSentinel(price)) {
+        const loc = getCurrentLocation();
+        results.push({
+          itemId: itemId.replace(/@\d+$/, ''),
+          quality: typeof quality === 'number' ? quality : 1,
+          price: Number(price),
+          amount: typeof amount === 'number' ? amount : 1,
+          auctionType,
+          locationId: loc.id,
+          locationName: loc.name,
+          enchant: 0,
+          source: 'params_hashtable',
+          opCode,
+        });
+      }
     }
   }
 }
 
 /**
  * Parse raw UDP payload and extract auction data.
- * Returns array of { itemId, price } objects, or empty array.
  */
 function parsePhotonPacket(payload) {
   if (payload.length < 12) return [];
@@ -569,10 +737,10 @@ function parsePhotonPacket(payload) {
   const stream = new PhotonStream(payload);
 
   // Photon header: peerId(2) + flags(1) + commandCount(1) + timestamp(4) + challenge(4)
-  stream.skip(2); // peerId
-  stream.skip(1); // flags
-  const numCmds = stream.readByte(); // commandCount
-  stream.skip(8); // timestamp + challenge
+  stream.skip(2);
+  stream.skip(1);
+  const numCmds = stream.readByte();
+  stream.skip(8);
 
   for (let cmdIdx = 0; cmdIdx < numCmds; cmdIdx++) {
     if (stream.remaining() < 12) break;
@@ -585,17 +753,13 @@ function parsePhotonPacket(payload) {
     const seqNum = stream.readUint32();
 
     const bodyLength = cmdLength - 12;
-    if (bodyLength <= 0 || bodyLength > stream.remaining()) {
-      break;
-    }
+    if (bodyLength <= 0 || bodyLength > stream.remaining()) break;
 
-    if (cmdType === 4) {
-      break;
-    }
+    if (cmdType === 4) break;
 
     if (cmdType === 6 || cmdType === 7) {
       if (cmdType === 7) {
-        stream.skip(4); // unreliable header: reliableSequenceNumber(4)
+        stream.skip(4); // unreliable header
       }
 
       const msgPayload = new PhotonStream(payload, stream.pos);
@@ -605,7 +769,7 @@ function parsePhotonPacket(payload) {
         const msg = decodeMessage(msgPayload);
         handleMessage(msg, results);
       } catch (e) {
-        // decode error
+        dbg(`    decode error: ${e.message}`);
       }
       continue;
     }
@@ -647,7 +811,7 @@ function parsePhotonPacket(payload) {
             const msg = decodeMessage(msgPayload);
             handleMessage(msg, results);
           } catch (e) {
-            // reassembled decode error
+            dbg(`    reassembled decode error: ${e.message}`);
           }
         }
       }
@@ -657,6 +821,7 @@ function parsePhotonPacket(payload) {
     stream.skip(bodyLength);
   }
 
+  // Cleanup old fragments
   const now = Date.now();
   for (const [key, entry] of _fragBufs) {
     if (now - entry.created > MAX_FRAG_AGE_MS) {
@@ -669,43 +834,4 @@ function parsePhotonPacket(payload) {
 
 function setDebug(on) { _debug = on; }
 
-function extractAuctionData(params, results) {
-  for (const key of Object.keys(params)) {
-    const val = params[key];
-    if (!Array.isArray(val)) continue;
-
-    for (const entry of val) {
-      if (!entry || typeof entry !== 'object') continue;
-
-      let itemId = entry.itemTypeId || entry.itemId;
-      let price = entry.unitPrice || entry.price;
-      let quality = entry.quality || 1;
-
-      if (!itemId) {
-        for (const k of Object.keys(entry)) {
-          const v = entry[k];
-          if (typeof v === 'string' && /^T[1-8]_/.test(v)) itemId = v;
-        }
-      }
-      if (!price) {
-        for (const k of Object.keys(entry)) {
-          const v = entry[k];
-          if (typeof v === 'number' && !isSentinel(v) && v >= 100) {
-            price = v;
-            break;
-          }
-        }
-      }
-
-      if (itemId && typeof itemId === 'string' && price && !isSentinel(price)) {
-        results.push({
-          itemId: itemId.replace(/@\d+$/, ''),
-          quality: typeof quality === 'number' ? quality : 1,
-          price: Number(price),
-        });
-      }
-    }
-  }
-}
-
-module.exports = { parsePhotonPacket, setDebug, isSentinel, SENTINELS, MAX_PRICE };
+module.exports = { parsePhotonPacket, setDebug, isSentinel, SENTINELS, MAX_PRICE, getCurrentLocation, getLocationName, LOCATION_NAMES };

@@ -4,7 +4,7 @@ const { Cap, decoders } = require('cap');
 const { PROTOCOL } = decoders;
 const network = require('network');
 const fetch = require('node-fetch');
-const { parsePhotonPacket, setDebug } = require('./photon');
+const { parsePhotonPacket, setDebug, getCurrentLocation } = require('./photon');
 
 const SERVER = 'http://191.252.219.229:3000';
 const DEBUG = process.env.DEBUG === '1';
@@ -23,10 +23,10 @@ class BatchSender {
     setInterval(() => this.flush(), this.batchInterval);
   }
 
-  addItem(itemId, price, quality) {
+  addItem(itemId, price, quality, city) {
     this.buffer.push({
       itemId,
-      city: 'Caerleon',
+      city: city || 'Caerleon',
       quality: quality || 1,
       sellPriceMin: price,
       sellPriceMax: price,
@@ -81,10 +81,11 @@ function main() {
   const sender = new BatchSender();
 
   log('---');
-  log('Albion Market Insights - Cliente v3.0 (Protocol18)');
+  log('Albion Market Insights - Cliente v4.0 (AODP Architecture)');
   log('---');
   log('Iniciando captura de pacotes...');
   log('Abra o Albion Online e visite o mercado.');
+  log('A cidade sera detectada automaticamente.');
   log('Pressione Ctrl+C para sair.');
   log('');
   if (DEBUG) log('MODO DEBUG ATIVADO');
@@ -134,9 +135,10 @@ function main() {
         parsedCount++;
         if (items.length > 0) {
           foundCount += items.length;
-          for (const { itemId, price, quality } of items) {
-            sender.addItem(itemId, price, quality);
-            log(`Item: ${itemId} = ${price} silver`);
+          for (const { itemId, price, quality, locationName, amount, auctionType } of items) {
+            sender.addItem(itemId, price, quality, locationName);
+            const tag = auctionType === 'request' ? '[COMPRAR]' : '[VENDER]';
+            log(`${tag} ${itemId} = ${price} silver x${amount} (${locationName})`);
           }
         }
       } catch (e) {
@@ -146,8 +148,9 @@ function main() {
 
     setInterval(() => {
       const s = sender.getStats();
+      const loc = getCurrentLocation();
       if (pktCount > 0) {
-        log(`Pacotes: ${pktCount} recebidos, ${parsedCount} parseados, ${foundCount} itens, ${s.items} enviados`);
+        log(`Stats: ${pktCount} pkts, ${foundCount} itens, ${s.items} enviados | Cidade: ${loc.name}`);
       }
     }, 15000);
   });

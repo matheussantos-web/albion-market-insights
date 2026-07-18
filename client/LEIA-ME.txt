@@ -1,5 +1,5 @@
 ===============================================
- ALBION MARKET INSIGHTS - CLIENTE v2.0
+ ALBION MARKET INSIGHTS - CLIENTE v4.0
  Contribuicao com dados de mercado
 ===============================================
 
@@ -10,6 +10,8 @@ O QUE E?
   no mercado do Albion Online e envia pro
   servidor da guild, ajudando todo mundo a
   ter dados de mercado atualizados.
+
+  A cidade e detectada automaticamente!
 
 
 COMO INSTALAR:
@@ -32,6 +34,7 @@ COMO INSTALAR:
   3. Va ate o mercado no jogo
   4. Clique nos itens pra ver precos
   5. Os dados sao enviados automaticamente!
+  6. A cidade e detectada ao visitar o mercado
 
   IMPORTANTE: Execute INICIAR.bat como
   Administrador toda vez que for jogar.
@@ -41,9 +44,11 @@ O QUE E ENVIADO?
 ----------------
   Apenas precos de mercado:
   - Item ID (ex: T4_BAG)
-  - Cidade (ex: Caerleon)
+  - Cidade (detectada automaticamente)
   - Precos (sell/buy min/max)
+  - Quantidade disponivel
   - Qualidade do item
+  - Tipo (venda/compra)
   - Timestamp
 
   NAO e enviado sua senha, itens, ou dados pessoais.

@@ -15,8 +15,7 @@ if %errorLevel% neq 0 (
 )
 echo OK - Administrador confirmado.
 echo.
-echo Iniciando cliente (modo debug)...
+echo Iniciando cliente...
 echo.
-set DEBUG=1
 node "%~dp0index.js"
 pause
