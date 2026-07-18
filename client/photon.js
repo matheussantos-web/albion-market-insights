@@ -250,6 +250,9 @@ function decodeOperationResponse(stream) {
   return { opCode, returnCode, debugMsg, params };
 }
 
+let _debug = false;
+function dbg(...args) { if (_debug) console.log('[photon]', ...args); }
+
 /**
  * Parse raw UDP payload and extract auction data.
  * Returns array of { itemId, price } objects, or empty array.
@@ -261,18 +264,29 @@ function parsePhotonPacket(payload) {
   const stream = new PhotonStream(payload);
 
   // Photon header: peerId(2) + flags(1) + commandCount(1) + timestamp(4) + challenge(4)
-  stream.skip(12);
+  const peerId = stream.readInt16();
+  const flags = stream.readByte();
+  const cmdCount = stream.readByte();
+  stream.skip(8); // timestamp + challenge
 
-  for (let cmdIdx = 0; cmdIdx < 10; cmdIdx++) { // max 10 commands per packet
+  dbg(`pkt: peer=${peerId} flags=${flags} cmds=${cmdCount} len=${payload.length}`);
+
+  for (let cmdIdx = 0; cmdIdx < cmdCount; cmdIdx++) { // max commands per packet
     if (stream.remaining() < 12) break;
 
+    const cmdStart = stream.pos;
     const cmdType = stream.readByte();
     stream.skip(3); // channelId, commandFlags, unkBytes
     const cmdLength = stream.readUint32();
     stream.skip(4); // sequenceNumber
 
     const bodyLength = cmdLength - 12;
-    if (bodyLength <= 0 || bodyLength > stream.remaining()) break;
+    if (bodyLength <= 0 || bodyLength > stream.remaining()) {
+      dbg(`  cmd[${cmdIdx}] type=${cmdType} bad length ${cmdLength}, remaining=${stream.remaining()}`);
+      break;
+    }
+
+    dbg(`  cmd[${cmdIdx}] type=${cmdType} bodyLen=${bodyLength}`);
 
     if (cmdType === 4) {
       // Disconnect
@@ -289,6 +303,8 @@ function parsePhotonPacket(payload) {
       stream.skip(1); // padding byte
       const msgType = stream.readByte();
 
+      dbg(`    msgType=${msgType} (2=Request,3=Response,4=Event)`);
+
       const msgPayload = new PhotonStream(payload, stream.pos);
       stream.skip(bodyLength - 2);
 
@@ -296,20 +312,22 @@ function parsePhotonPacket(payload) {
         if (msgType === 3) {
           // OperationResponse
           const resp = decodeOperationResponse(msgPayload);
+          dbg(`    opResponse: code=${resp.opCode} returnCode=${resp.returnCode}`);
           if (AUCTION_OPS.has(resp.opCode)) {
+            dbg(`    >>> AUCTION OP ${resp.opCode}! Extracting data...`);
             extractAuctionData(resp.params, results);
           }
         } else if (msgType === 4) {
           // Event
           const evt = decodeEvent(msgPayload);
+          dbg(`    event: code=${evt.code}`);
           if (evt.code === MARKET_EVENT) {
+            dbg(`    >>> MARKET EVENT ${evt.code}! Extracting data...`);
             extractAuctionData(evt.params, results);
           }
-        } else {
-          stream.skip(bodyLength - 2);
         }
       } catch (e) {
-        // Skip this message
+        dbg(`    decode error: ${e.message}`);
       }
       continue;
     }
@@ -326,6 +344,8 @@ function parsePhotonPacket(payload) {
 
   return results;
 }
+
+function setDebug(on) { _debug = on; }
 
 function extractAuctionData(params, results) {
   // Auction data comes as arrays of auction objects in the parameters.
@@ -372,4 +392,4 @@ function extractAuctionData(params, results) {
   }
 }
 
-module.exports = { parsePhotonPacket, isSentinel, SENTINELS, MAX_PRICE };
+module.exports = { parsePhotonPacket, setDebug, isSentinel, SENTINELS, MAX_PRICE };

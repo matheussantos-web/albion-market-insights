@@ -4,9 +4,10 @@ const { Cap, decoders } = require('cap');
 const { PROTOCOL } = decoders;
 const network = require('network');
 const fetch = require('node-fetch');
-const { parsePhotonPacket } = require('./photon');
+const { parsePhotonPacket, setDebug } = require('./photon');
 
 const SERVER = 'http://191.252.219.229:3000';
+const DEBUG = process.env.DEBUG === '1';
 
 function log(msg) { console.log(`[ami-client] ${msg}`); }
 function logError(msg) { console.error(`[ami-client] ERRO: ${msg}`); }
@@ -86,6 +87,7 @@ function main() {
   log('Abra o Albion Online e visite o mercado.');
   log('Pressione Ctrl+C para sair.');
   log('');
+  if (DEBUG) log('MODO DEBUG ATIVADO');
 
   const cap = new Cap();
   const buffer = Buffer.alloc(65535);
@@ -106,8 +108,14 @@ function main() {
     log(`Rede: ${obj.ip_address}`);
     log(`Filtrando pacotes UDP na porta 5056...`);
     log('');
+    setDebug(DEBUG);
+
+    let pktCount = 0;
+    let parsedCount = 0;
+    let foundCount = 0;
 
     cap.on('packet', (nBytes) => {
+      pktCount++;
       if (linkType !== 'ETHERNET') return;
 
       let ret = decoders.Ethernet(buffer);
@@ -123,9 +131,13 @@ function main() {
 
       try {
         const items = parsePhotonPacket(payload);
-        for (const { itemId, price, quality } of items) {
-          sender.addItem(itemId, price, quality);
-          log(`Item: ${itemId} = ${price} silver`);
+        parsedCount++;
+        if (items.length > 0) {
+          foundCount += items.length;
+          for (const { itemId, price, quality } of items) {
+            sender.addItem(itemId, price, quality);
+            log(`Item: ${itemId} = ${price} silver`);
+          }
         }
       } catch (e) {
         // Ignore unparseable packets
@@ -134,10 +146,10 @@ function main() {
 
     setInterval(() => {
       const s = sender.getStats();
-      if (s.received > 0) {
-        log(`Stats: ${s.received} capturados, ${s.items} enviados, ${s.errors} erros`);
+      if (pktCount > 0) {
+        log(`Pacotes: ${pktCount} recebidos, ${parsedCount} parseados, ${foundCount} itens, ${s.items} enviados`);
       }
-    }, 30000);
+    }, 15000);
   });
 
   process.on('SIGINT', () => { sender.flush().then(() => process.exit(0)); });
