@@ -6,6 +6,7 @@
   "bin": "index.js",
   "scripts": {
     "start": "node index.js",
+    "postinstall": "node scripts/patch-ao-network.js",
     "build": "pkg . --target node18-win-x64 --output dist/albion-client.exe --compress GZip",
     "build:zip": "npm run build && node scripts/package.js"
   },
