@@ -81,7 +81,7 @@ function main() {
   const sender = new BatchSender();
 
   log('---');
-  log('Albion Market Insights - Cliente v2.0');
+  log('Albion Market Insights - Cliente v3.0 (Protocol18)');
   log('---');
   log('Iniciando captura de pacotes...');
   log('Abra o Albion Online e visite o mercado.');
