@@ -4,46 +4,12 @@ const { Cap, decoders } = require('cap');
 const { PROTOCOL } = decoders;
 const network = require('network');
 const fetch = require('node-fetch');
+const { parsePhotonPacket } = require('./photon');
 
 const SERVER = 'http://191.252.219.229:3000';
 
 function log(msg) { console.log(`[ami-client] ${msg}`); }
 function logError(msg) { console.error(`[ami-client] ERRO: ${msg}`); }
-
-const SENTINELS = new Set([999999, 1000000, 9999999, 99999999, 2147483647, 0]);
-const MAX_PRICE = 50000000;
-const ITEM_ID_REGEX = /T[1-8]_[A-Z0-9_@]+/g;
-
-function isSentinel(v) {
-  if (!v || v <= 0) return true;
-  if (SENTINELS.has(v)) return true;
-  if (v > MAX_PRICE) return true;
-  return false;
-}
-
-function scanBuffer(buf, offset, length) {
-  const results = [];
-  const sub = buf.slice(offset, offset + length);
-  const str = sub.toString('ascii');
-
-  let match;
-  ITEM_ID_REGEX.lastIndex = 0;
-  while ((match = ITEM_ID_REGEX.exec(str)) !== null) {
-    const itemId = match[0].replace(/@\d+$/, '');
-    const pos = match.index;
-
-    for (let i = pos + match[0].length; i < Math.min(pos + match[0].length + 60, length); i++) {
-      if (i + 4 > length) break;
-      const val = sub.readUInt32BE(i);
-      if (!isSentinel(val) && val >= 100 && val <= MAX_PRICE) {
-        results.push({ itemId, price: val });
-        break;
-      }
-    }
-  }
-
-  return results;
-}
 
 // ── Batch sender ──
 class BatchSender {
@@ -52,16 +18,15 @@ class BatchSender {
     this.batchInterval = 5000;
     this.maxBatchSize = 100;
     this.stats = { received: 0, sent: 0, errors: 0, items: 0 };
-    this.currentCity = 'Caerleon';
 
     setInterval(() => this.flush(), this.batchInterval);
   }
 
-  addItem(itemId, price, city) {
+  addItem(itemId, price, quality) {
     this.buffer.push({
       itemId,
-      city: city || this.currentCity,
-      quality: 1,
+      city: 'Caerleon',
+      quality: quality || 1,
       sellPriceMin: price,
       sellPriceMax: price,
       buyPriceMin: null,
@@ -128,7 +93,6 @@ function main() {
   network.get_active_interface((err, obj) => {
     if (err) {
       logError('Não foi possível encontrar rede ativa.');
-      log('Verifique sua conexão com a internet.');
       process.exit(1);
     }
 
@@ -155,13 +119,16 @@ function main() {
       ret = decoders.UDP(buffer, ret.offset);
       if (ret.info.srcport != 5056 && ret.info.dstport != 5056) return;
 
-      const udpPayloadOffset = ret.offset;
-      const udpPayloadLength = ret.info.length;
+      const payload = buffer.slice(ret.offset, ret.offset + ret.info.length);
 
-      // Scan for item IDs and prices
-      const items = scanBuffer(buffer, udpPayloadOffset, udpPayloadLength);
-      for (const { itemId, price } of items) {
-        sender.addItem(itemId, price);
+      try {
+        const items = parsePhotonPacket(payload);
+        for (const { itemId, price, quality } of items) {
+          sender.addItem(itemId, price, quality);
+          log(`Item: ${itemId} = ${price} silver`);
+        }
+      } catch (e) {
+        // Ignore unparseable packets
       }
     });
 
