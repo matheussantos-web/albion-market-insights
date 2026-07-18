@@ -6,12 +6,12 @@
   "bin": "index.js",
   "scripts": {
     "start": "node index.js",
-    "postinstall": "node scripts/patch-ao-network.js",
     "build": "pkg . --target node18-win-x64 --output dist/albion-client.exe --compress GZip",
     "build:zip": "npm run build && node scripts/package.js"
   },
   "dependencies": {
-    "ao-network": "^2.0.1",
+    "cap": "^0.2.1",
+    "network": "^0.1.2",
     "node-fetch": "^2.7.0"
   },
   "devDependencies": {
@@ -20,8 +20,7 @@
   },
   "pkg": {
     "assets": [
-      "node_modules/cap/build/**/*",
-      "capture.js"
+      "node_modules/cap/build/**/*"
     ],
     "targets": [
       "node18-win-x64"

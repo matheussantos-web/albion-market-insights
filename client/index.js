@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-const AONetwork = require('ao-network');
+const { Cap, decoders } = require('cap');
+const { PROTOCOL } = decoders;
+const network = require('network');
 const fetch = require('node-fetch');
 
 const SERVER = 'http://191.252.219.229:3000';
@@ -19,32 +21,6 @@ const CITY_PATTERNS = [
   { pattern: /black.market/i, city: 'Black Market' },
 ];
 
-function detectCity(params) {
-  for (const key of Object.keys(params)) {
-    const val = params[key];
-    if (typeof val === 'string') {
-      for (const { pattern, city } of CITY_PATTERNS) {
-        if (pattern.test(val)) return city;
-      }
-    }
-    if (typeof val === 'object' && val !== null) {
-      const str = JSON.stringify(val);
-      for (const { pattern, city } of CITY_PATTERNS) {
-        if (pattern.test(str)) return city;
-      }
-    }
-  }
-  return null;
-}
-
-// ── Market data extraction ──
-const AUCTION_OPS = {
-  AuctionGetOffers: 75,
-  AuctionGetRequests: 76,
-  AuctionGetItemAverageStats: 89,
-  AuctionGetItemAverageValue: 90,
-};
-
 const SENTINELS = new Set([999999, 1000000, 9999999, 99999999, 2147483647, 0]);
 const MAX_PRICE = 50000000;
 
@@ -55,66 +31,45 @@ function isSentinel(v) {
   return false;
 }
 
-function extractMarketData(operationCode, params) {
-  const items = [];
+// ── Raw packet parser ──
+// Albion item IDs match: T[1-8]_[A-Z0-9_]+ (e.g. T4_BAG, T8_2H_HOLYSTAFF)
+const ITEM_ID_REGEX = /T[1-8]_[A-Z0-9_@]+/g;
 
-  for (const key of Object.keys(params)) {
-    const val = params[key];
-    if (!Array.isArray(val)) continue;
+function scanBuffer(buf, offset, length) {
+  const results = [];
+  const sub = buf.slice(offset, offset + length);
+  const str = sub.toString('ascii');
 
-    for (const entry of val) {
-      if (!entry || typeof entry !== 'object') continue;
+  // Find all item IDs in the packet
+  let match;
+  ITEM_ID_REGEX.lastIndex = 0;
+  while ((match = ITEM_ID_REGEX.exec(str)) !== null) {
+    const itemId = match[0].replace(/@\d+$/, ''); // strip enchant suffix
+    const pos = match.index;
 
-      const itemTypeId = entry.itemTypeId || entry['0'] || entry.itemId;
-      const unitPrice = entry.unitPrice || entry['3'] || entry.price;
-      const amount = entry.amount || entry['4'] || entry.quantity;
-      const quality = entry.quality || entry['2'] || 1;
-      const auctionType = entry.auctionType || entry['5'] || entry.type;
-
-      if (itemTypeId && typeof itemTypeId === 'string' && unitPrice) {
-        if (!isSentinel(unitPrice)) {
-          items.push({
-            itemId: itemTypeId,
-            quality: quality,
-            unitPrice: Number(unitPrice),
-            amount: Number(amount || 1),
-            auctionType: Number(auctionType || 1),
-          });
-        }
+    // Look for integer values (prices) within 60 bytes after the item ID
+    // Prices are typically 4-byte big-endian integers
+    for (let i = pos + match[0].length; i < Math.min(pos + match[0].length + 60, length); i++) {
+      if (i + 4 > length) break;
+      const val = sub.readUInt32BE(i);
+      if (!isSentinel(val) && val >= 100 && val <= MAX_PRICE) {
+        results.push({ itemId, price: val });
+        break; // one price per item ID occurrence
       }
     }
   }
 
-  if (params['248'] && Array.isArray(params['248'])) {
-    for (const entry of params['248']) {
-      if (!entry || typeof entry !== 'object') continue;
-      const keys = Object.keys(entry);
-      if (keys.length < 2) continue;
+  return results;
+}
 
-      let itemId = null;
-      let price = null;
-
-      for (const k of keys) {
-        const v = entry[k];
-        if (typeof v === 'string' && /^T\d/.test(v)) itemId = v;
-        if (typeof v === 'number' && v > 0 && !isSentinel(v)) {
-          if (!price) price = v;
-        }
-      }
-
-      if (itemId && price) {
-        items.push({
-          itemId,
-          quality: 1,
-          unitPrice: price,
-          amount: 1,
-          auctionType: 1,
-        });
-      }
-    }
+// ── City from packet ──
+function detectCityFromBuffer(buf, offset, length) {
+  const sub = buf.slice(offset, offset + length);
+  const str = sub.toString('utf8');
+  for (const { pattern, city } of CITY_PATTERNS) {
+    if (pattern.test(str)) return city;
   }
-
-  return items;
+  return null;
 }
 
 // ── Batch sender ──
@@ -129,21 +84,18 @@ class BatchSender {
     setInterval(() => this.flush(), this.batchInterval);
   }
 
-  addItems(items, city) {
-    const c = city || this.currentCity;
-    for (const item of items) {
-      this.buffer.push({
-        itemId: item.itemId,
-        city: c,
-        quality: item.quality || 1,
-        sellPriceMin: item.auctionType === 1 ? item.unitPrice : null,
-        sellPriceMax: item.auctionType === 1 ? item.unitPrice : null,
-        buyPriceMin: item.auctionType === 2 ? item.unitPrice : null,
-        buyPriceMax: item.auctionType === 2 ? item.unitPrice : null,
-        timestamp: new Date().toISOString(),
-      });
-      this.stats.received++;
-    }
+  addItem(itemId, price, city) {
+    this.buffer.push({
+      itemId,
+      city: city || this.currentCity,
+      quality: 1,
+      sellPriceMin: price,
+      sellPriceMax: price,
+      buyPriceMin: null,
+      buyPriceMax: null,
+      timestamp: new Date().toISOString(),
+    });
+    this.stats.received++;
 
     if (this.buffer.length >= this.maxBatchSize) {
       this.flush();
@@ -189,80 +141,71 @@ class BatchSender {
 function main() {
   const sender = new BatchSender();
 
-  process.on('uncaughtException', (err) => {
-    logError(`Pacote ignorado: ${err.message}`);
-  });
-
   log('---');
   log('Albion Market Insights - Cliente v2.0');
   log('---');
   log('Iniciando captura de pacotes...');
-  log('Abra o Albion Online e visite o mercado para enviar dados.');
+  log('Abra o Albion Online e visite o mercado.');
   log('Pressione Ctrl+C para sair.');
   log('');
 
-  let aoNet;
-  try {
-    aoNet = new AONetwork();
-  } catch (err) {
-    logError(`Falha ao iniciar captura: ${err.message}`);
-    log('');
-    log('Possíveis causas:');
-    log('  1. Npcap não instalado — execute npcap-1.88.exe');
-    log('  2. Não está rodando como administrador');
-    log('  3. Nenhuma interface de rede ativa');
-    log('');
-    log('Instale o Npcap (opção WinPcap compat) e reinicie como admin.');
-    process.exit(1);
-  }
+  const cap = new Cap();
+  const buffer = Buffer.alloc(65535);
 
-  aoNet.events.use((result) => {
-    try {
-      const ctx = result.context;
-      if (!ctx || !ctx.parameters) return;
-      const city = detectCity(ctx.parameters);
+  network.get_active_interface((err, obj) => {
+    if (err) {
+      logError('Não foi possível encontrar rede ativa.');
+      log('Verifique sua conexão com a internet.');
+      process.exit(1);
+    }
+
+    const device = Cap.findDevice(obj.ip_address);
+    const filter = 'udp and (dst port 5056 or src port 5056)';
+    const bufSize = 10 * 1024 * 1024;
+
+    const linkType = cap.open(device, filter, bufSize, buffer);
+    cap.setMinBytes && cap.setMinBytes(0);
+
+    log(`Rede: ${obj.ip_address}`);
+    log(`Filtrando pacotes UDP na porta 5056...`);
+    log('');
+
+    cap.on('packet', (nBytes) => {
+      if (linkType !== 'ETHERNET') return;
+
+      let ret = decoders.Ethernet(buffer);
+      if (ret.info.type !== PROTOCOL.ETHERNET.IPV4) return;
+
+      ret = decoders.IPV4(buffer, ret.offset);
+      if (ret.info.protocol !== PROTOCOL.IP.UDP) return;
+
+      ret = decoders.UDP(buffer, ret.offset);
+      if (ret.info.srcport != 5056 && ret.info.dstport != 5056) return;
+
+      const udpPayloadOffset = ret.offset;
+      const udpPayloadLength = ret.info.length;
+
+      // Detect city from packet
+      const city = detectCityFromBuffer(buffer, udpPayloadOffset, udpPayloadLength);
       if (city && city !== sender.currentCity) {
         sender.currentCity = city;
         log(`Cidade detectada: ${city}`);
       }
-    } catch (e) {}
-  });
 
-  aoNet.events.on(aoNet.AODecoder.messageType.OperationResponse, (context) => {
-    try {
-      if (!context || !context.parameters) return;
-      const opCode = context.parameters['253'];
-      if (opCode === undefined) return;
-      if (!Object.values(AUCTION_OPS).includes(opCode)) return;
-
-      const items = extractMarketData(opCode, context.parameters);
-      if (items.length > 0) {
-        sender.addItems(items);
-        log(`Mercado: ${items.length} itens capturados (op: ${opCode})`);
+      // Scan for item IDs and prices
+      const items = scanBuffer(buffer, udpPayloadOffset, udpPayloadLength);
+      for (const { itemId, price } of items) {
+        sender.addItem(itemId, price);
       }
-    } catch (e) {}
-  });
+    });
 
-  aoNet.events.on(aoNet.AODecoder.messageType.Event, (context) => {
-    try {
-      if (!context || !context.parameters) return;
-      const eventCode = context.parameters['252'];
-      if (eventCode === 181) {
-        const items = extractMarketData(eventCode, context.parameters);
-        if (items.length > 0) {
-          sender.addItems(items);
-          log(`Evento mercado: ${items.length} itens capturados`);
-        }
+    setInterval(() => {
+      const s = sender.getStats();
+      if (s.received > 0) {
+        log(`Stats: ${s.received} capturados, ${s.items} enviados, ${s.errors} erros`);
       }
-    } catch (e) {}
+    }, 30000);
   });
-
-  setInterval(() => {
-    const s = sender.getStats();
-    if (s.received > 0) {
-      log(`Stats: ${s.received} capturados, ${s.items} enviados, ${s.errors} erros`);
-    }
-  }, 30000);
 
   process.on('SIGINT', () => { sender.flush().then(() => process.exit(0)); });
   process.on('SIGTERM', () => { sender.flush().then(() => process.exit(0)); });
