@@ -13,6 +13,14 @@ function isSentinel(v) {
   return false;
 }
 
+// Detects prices that are suspiciously low — likely a scale/decoding error
+// (game sends UnitPriceSilver × 10000; if division is skipped or doubled,
+// result is off by factor of 100 or 10000)
+function looksUnderscaled(price) {
+  if (!price || price <= 0) return false;
+  return price < 100;
+}
+
 /**
  * POST /api/ingest
  * Accepts anonymous market data from any client.
@@ -51,6 +59,10 @@ router.post('/', (req, res) => {
       }
 
       if (isSentinel(row.sellPriceMin)) { skippedSentinel++; continue; }
+
+      if (looksUnderscaled(row.sellPriceMin) || looksUnderscaled(row.buyPriceMin)) {
+        console.warn(`[ingest] PRICE_ANOMALY: item=${row.itemId} city=${row.city} sell=${row.sellPriceMin} buy=${row.buyPriceMin} auction=${row.auctionType}`);
+      }
 
       insertPrice.run({
         item_unique_name: row.itemId,

@@ -37,6 +37,11 @@ function isSentinel(v) {
   return false;
 }
 
+function looksUnderscaled(price) {
+  if (!price || price <= 0) return false;
+  return price < 100;
+}
+
 function buildInsertFn(db) {
   const getLocationId = db.prepare('SELECT id FROM locations WHERE name = ?');
   const insertPrice = db.prepare(INSERT_SQL);
@@ -48,6 +53,10 @@ function buildInsertFn(db) {
       if (!row.sell_price_min && !row.buy_price_min) continue;
 
       if (isSentinel(row.sell_price_min)) { rejected++; continue; }
+
+      if (looksUnderscaled(row.sell_price_min) || looksUnderscaled(row.buy_price_min)) {
+        console.warn(`[publicSync] PRICE_ANOMALY: item=${row.item_id} city=${row.city} sell=${row.sell_price_min} buy=${row.buy_price_min}`);
+      }
 
       const location = getLocationId.get(row.city);
       if (!location) continue;
