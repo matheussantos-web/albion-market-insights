@@ -28,15 +28,17 @@ class BatchSender {
     setInterval(() => this.flush(), this.batchInterval);
   }
 
-  addItem(itemId, price, quality, city) {
+  addItem(itemId, price, quality, city, auctionType) {
+    const isBuy = auctionType === 'request';
     this.buffer.push({
       itemId,
       city: city || 'Caerleon',
       quality: quality || 1,
-      sellPriceMin: price,
-      sellPriceMax: price,
-      buyPriceMin: null,
-      buyPriceMax: null,
+      sellPriceMin: isBuy ? null : price,
+      sellPriceMax: isBuy ? null : price,
+      buyPriceMin: isBuy ? price : null,
+      buyPriceMax: isBuy ? price : null,
+      auctionType: auctionType || 'offer',
       timestamp: new Date().toISOString(),
     });
     this.stats.received++;
@@ -147,7 +149,7 @@ function main() {
         if (items.length > 0) {
           foundCount += items.length;
           for (const { itemId, price, quality, locationName, amount, auctionType } of items) {
-            sender.addItem(itemId, price, quality, locationName);
+            sender.addItem(itemId, price, quality, locationName, auctionType);
             const tag = auctionType === 'request' ? '[COMPRAR]' : '[VENDER]';
             logToConsole(`${tag} ${itemId} = ${price} silver x${amount} (${locationName})`);
             logFile(`${tag} ${itemId} = ${price} silver x${amount} (${locationName})`);
