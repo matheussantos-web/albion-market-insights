@@ -70,6 +70,14 @@ function runMigrations(database) {
     database.pragma('foreign_keys = ON');
     console.log('[db] migration: FK removed, indexes recreated');
   }
+
+  // Migration: add item_base column
+  const itemCols = database.prepare("PRAGMA table_info(items)").all();
+  if (!itemCols.find(c => c.name === 'item_base')) {
+    database.exec('ALTER TABLE items ADD COLUMN item_base TEXT');
+    database.exec('CREATE INDEX IF NOT EXISTS idx_items_base ON items(item_base)');
+    console.log('[db] migration: item_base added to items');
+  }
 }
 
 module.exports = { getDb, init };

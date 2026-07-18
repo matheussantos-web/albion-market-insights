@@ -13,6 +13,12 @@ function parseEnchantment(uniqueName) {
   return match ? Number(match[1]) : 0;
 }
 
+function parseItemBase(uniqueName) {
+  return uniqueName
+    .replace(/^T\d+_/, '')
+    .replace(/@\d+$/, '');
+}
+
 function parseCategory(uniqueName) {
   const u = uniqueName.replace(/@\d$/, '');
 
@@ -126,8 +132,8 @@ async function run() {
 
   const db = init();
   const upsert = db.prepare(`
-    INSERT INTO items (unique_name, name_ptbr, name_en, tier, enchantment, category, tradeable)
-    VALUES (@unique_name, @name_ptbr, @name_en, @tier, @enchantment, @category, @tradeable)
+    INSERT INTO items (unique_name, name_ptbr, name_en, tier, enchantment, category, tradeable, item_base)
+    VALUES (@unique_name, @name_ptbr, @name_en, @tier, @enchantment, @category, @tradeable, @item_base)
     ON CONFLICT(unique_name) DO UPDATE SET
       name_ptbr = excluded.name_ptbr,
       name_en = excluded.name_en,
@@ -135,6 +141,7 @@ async function run() {
       enchantment = excluded.enchantment,
       category = excluded.category,
       tradeable = excluded.tradeable,
+      item_base = excluded.item_base,
       updated_at = datetime('now')
   `);
 
@@ -152,6 +159,7 @@ async function run() {
         enchantment: parseEnchantment(uniqueName),
         category: parseCategory(uniqueName),
         tradeable: isTradeable(parseCategory(uniqueName)) ? 1 : 0,
+        item_base: parseItemBase(uniqueName),
       });
       count += 1;
     }

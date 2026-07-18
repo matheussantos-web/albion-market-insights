@@ -16,6 +16,9 @@ const CATEGORY_TREE = [
   { label: '🏠 Outros', children: ['Gemas', 'Mobilha', 'Decoracao', 'Itens Unicos'] }
 ];
 
+const QUALITY_LABELS = { 0: 'Normal', 1: 'Incomum', 2: 'Raro', 3: 'Épico', 4: 'Lendário' };
+const TIER_NAMES = { 3: 'T3', 4: 'T4', 5: 'T5', 6: 'T6', 7: 'T7', 8: 'T8' };
+
 function fmtPrice(v) {
   if (!v && v !== 0) return '—';
   return Number(v).toLocaleString('pt-BR');
@@ -31,10 +34,14 @@ function timeAgo(dateStr) {
   return Math.floor(h / 24) + 'd';
 }
 
+function tierIcon(tier) {
+  const colors = { 3: '#6b6b6b', 4: '#2d8f2d', 5: '#2277dd', 6: '#9944cc', 7: '#dd7700', 8: '#cc2222' };
+  return `<span style="color:${colors[tier] || '#888'};font-weight:700;font-size:0.8rem">T${tier}</span>`;
+}
+
 Router.register('/itens', async (app, params) => {
   const urlParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
   let activeCategory = urlParams.get('cat') || '';
-  let activeTier = '';
   let categories = [];
 
   app.innerHTML = `
@@ -48,21 +55,10 @@ Router.register('/itens', async (app, params) => {
         </div>
       </aside>
       <div class="page-content" id="pageContent">
-        <div class="tier-bar" id="tierBar">
-          <span class="label">Tier:</span>
-          <button data-tier="" class="active">Todos</button>
-          <button data-tier="3">T3</button>
-          <button data-tier="4">T4</button>
-          <button data-tier="5">T5</button>
-          <button data-tier="6">T6</button>
-          <button data-tier="7">T7</button>
-          <button data-tier="8">T8</button>
+        <div id="breadcrumb" style="margin-bottom:0.8rem;font-size:0.75rem;color:var(--text-dim)">
+          <span style="color:var(--gold);cursor:pointer" id="bcAll">Todos</span>
         </div>
-        <div style="position:relative;margin-bottom:0.8rem">
-          <input type="text" class="input" id="itemSearch" placeholder="Buscar item..." style="width:100%;font-size:0.85rem" autocomplete="off" />
-          <div class="search-results" id="itemResults"></div>
-        </div>
-        <div id="itemList" class="card"></div>
+        <div id="itemGrid" class="card" style="padding:1rem"></div>
       </div>
     </div>
   `;
@@ -106,114 +102,164 @@ Router.register('/itens', async (app, params) => {
       el.addEventListener('click', () => {
         activeCategory = el.dataset.cat;
         renderTree(document.getElementById('catSearch').value.trim().toLowerCase());
-        loadItems();
+        loadBases();
       });
     });
   }
 
-  function showBrowseUI() {
-    const pc = document.getElementById('pageContent');
-    pc.innerHTML = `
-      <div class="tier-bar" id="tierBar">
-        <span class="label">Tier:</span>
-        <button data-tier="" class="active">Todos</button>
-        <button data-tier="3">T3</button>
-        <button data-tier="4">T4</button>
-        <button data-tier="5">T5</button>
-        <button data-tier="6">T6</button>
-        <button data-tier="7">T7</button>
-        <button data-tier="8">T8</button>
-      </div>
-      <div style="position:relative;margin-bottom:0.8rem">
-        <input type="text" class="input" id="itemSearch" placeholder="Buscar item..." style="width:100%;font-size:0.85rem" autocomplete="off" />
-        <div class="search-results" id="itemResults"></div>
-      </div>
-      <div id="itemList" class="card"></div>
-    `;
-    bindTierBar();
-    bindItemSearch();
-    loadItems();
-  }
-
-  function bindTierBar() {
-    document.getElementById('tierBar').addEventListener('click', (e) => {
-      const btn = e.target.closest('button');
-      if (!btn) return;
-      activeTier = btn.dataset.tier;
-      document.getElementById('tierBar').querySelectorAll('button').forEach(b =>
-        b.classList.toggle('active', b.dataset.tier === activeTier)
-      );
-      loadItems();
+  function setBreadcrumb(parts) {
+    const bc = document.getElementById('breadcrumb');
+    let html = `<span style="color:var(--gold);cursor:pointer" id="bcAll">Todos</span>`;
+    parts.forEach((p, i) => {
+      html += ` <span style="color:var(--text-dim)">▸</span> `;
+      if (i < parts.length - 1) {
+        html += `<span style="color:var(--gold);cursor:pointer" class="bc-link" data-level="${i}">${p.label}</span>`;
+      } else {
+        html += `<span style="color:var(--text)">${p.label}</span>`;
+      }
+    });
+    bc.innerHTML = html;
+    document.getElementById('bcAll')?.addEventListener('click', () => {
+      activeCategory = '';
+      renderTree();
+      loadBases();
+    });
+    bc.querySelectorAll('.bc-link').forEach(el => {
+      el.addEventListener('click', () => {
+        const level = parseInt(el.dataset.level);
+        if (level === 0) { loadBases(); }
+      });
     });
   }
 
-  function bindItemSearch() {
-    const itemSearch = document.getElementById('itemSearch');
-    const itemResults = document.getElementById('itemResults');
-    let timeout;
-    itemSearch.addEventListener('input', () => {
-      clearTimeout(timeout);
-      const q = itemSearch.value.trim();
-      if (q.length < 2) { itemResults.classList.remove('active'); return; }
-      timeout = setTimeout(async () => {
-        const items = await searchItems(q, activeTier || undefined, activeCategory || undefined);
-        if (!items.length) {
-          itemResults.innerHTML = '<div class="sr-item" style="cursor:default;color:var(--text-dim)">Nenhum encontrado</div>';
-          itemResults.classList.add('active');
-          return;
-        }
-        itemResults.innerHTML = items.slice(0, 20).map(it => `
-          <div class="sr-item" data-id="${it.unique_name}">
-            <span class="sr-name">${it.name_ptbr || it.unique_name}</span>
-            <span class="sr-meta">
-              <span class="badge badge-gold">T${it.tier || '?'}</span>
-              ${it.enchantment > 0 ? `<span class="badge badge-purple">@${it.enchantment}</span>` : ''}
-            </span>
-          </div>
-        `).join('');
-        itemResults.classList.add('active');
-        itemResults.querySelectorAll('.sr-item[data-id]').forEach(el => {
-          el.addEventListener('click', () => showItemDetail(el.dataset.id));
-        });
-      }, 250);
-    });
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('#itemSearch')) itemResults.classList.remove('active');
-    });
-  }
+  async function loadBases() {
+    const grid = document.getElementById('itemGrid');
+    grid.innerHTML = '<div class="loading">Carregando...</div>';
+    setBreadcrumb([]);
 
-  async function loadItems() {
-    const list = document.getElementById('itemList');
-    list.innerHTML = '<div class="loading">Carregando...</div>';
     try {
-      const items = await searchItems('', activeTier || undefined, activeCategory || undefined);
-      if (!items.length) {
-        list.innerHTML = '<div class="empty-state"><p>Nenhum item encontrado</p></div>';
+      const bases = await getItemBases(activeCategory || undefined);
+      if (!bases.length) {
+        grid.innerHTML = '<div class="empty-state"><p>Nenhum item encontrado nesta categoria</p></div>';
         return;
       }
-      list.innerHTML = `<table class="data-table">
-        <thead><tr><th>Nome</th><th>ID</th><th>Tier</th><th>Enc</th><th>Categoria</th></tr></thead>
-        <tbody>${items.map(it => `
-          <tr style="cursor:pointer" data-id="${it.unique_name}" class="item-row">
-            <td style="font-weight:600">${it.name_ptbr || it.unique_name}</td>
-            <td style="font-family:monospace;font-size:0.7rem;color:var(--text-dim)">${it.unique_name}</td>
-            <td><span class="badge badge-gold">T${it.tier || '?'}</span></td>
-            <td>${it.enchantment > 0 ? `<span class="badge badge-purple">@${it.enchantment}</span>` : ''}</td>
-            <td><span class="badge badge-surface">${it.category || ''}</span></td>
-          </tr>
-        `).join('')}</tbody>
-      </table>`;
-      list.querySelectorAll('.item-row').forEach(row => {
-        row.addEventListener('click', () => showItemDetail(row.dataset.id));
+      grid.style.display = '';
+      grid.innerHTML = `<div class="section-title">${activeCategory || 'Todos os Itens'} — ${bases.length} itens</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.6rem;margin-top:0.6rem" id="basesList"></div>`;
+      const list = document.getElementById('basesList');
+      list.innerHTML = bases.map(b => `
+        <div class="card" style="padding:0.7rem;cursor:pointer;transition:border-color 0.15s" data-base="${b.item_base}" data-name="${b.name_ptbr}">
+          <div style="font-weight:600;font-size:0.85rem;margin-bottom:0.3rem">${b.name_ptbr || b.item_base}</div>
+          <div style="display:flex;gap:0.3rem;flex-wrap:wrap">
+            ${b.tiers.map(t => `<span class="badge badge-gold">${tierIcon(t)}</span>`).join('')}
+            <span class="badge badge-surface">${b.variant_count} vars</span>
+          </div>
+        </div>
+      `).join('');
+      list.querySelectorAll('.card[data-base]').forEach(el => {
+        el.addEventListener('click', () => showTiers(el.dataset.base, el.dataset.name));
       });
     } catch (e) {
-      list.innerHTML = `<div class="empty-state"><p>Erro: ${e.message}</p></div>`;
+      grid.innerHTML = `<div class="empty-state"><p>Erro: ${e.message}</p></div>`;
     }
   }
 
-  async function showItemDetail(itemId) {
-    const pc = document.getElementById('pageContent');
-    pc.innerHTML = '<div class="loading">Carregando...</div>';
+  async function showTiers(base, baseName) {
+    const grid = document.getElementById('itemGrid');
+    grid.innerHTML = '<div class="loading">Carregando variantes...</div>';
+    setBreadcrumb([{ label: baseName }]);
+
+    try {
+      const variants = await getItemVariants(base);
+      if (!variants.length) {
+        grid.innerHTML = '<div class="empty-state"><p>Nenhuma variante encontrada</p></div>';
+        return;
+      }
+      const tierMap = {};
+      variants.forEach(v => {
+        const t = v.tier;
+        if (!tierMap[t]) tierMap[t] = [];
+        tierMap[t].push(v);
+      });
+      const tiers = Object.keys(tierMap).map(Number).sort((a, b) => a - b);
+
+      grid.style.display = '';
+      grid.innerHTML = `
+        <div style="margin-bottom:0.8rem">
+          <a href="javascript:void(0)" id="backToBases" style="font-size:0.75rem;color:var(--gold);cursor:pointer">← Voltar a ${activeCategory || 'Todos'}</a>
+        </div>
+        <div class="section-title" style="margin-bottom:0.6rem">${baseName}</div>
+        <div style="display:flex;flex-direction:column;gap:0.5rem" id="tierList"></div>
+      `;
+      document.getElementById('backToBases').addEventListener('click', loadBases);
+
+      const tierList = document.getElementById('tierList');
+      tierList.innerHTML = tiers.map(t => `
+        <div class="card" style="padding:0.7rem;cursor:pointer;transition:border-color 0.15s" data-tier="${t}">
+          <div style="display:flex;align-items:center;gap:0.6rem">
+            ${tierIcon(t)}
+            <span style="font-size:0.8rem;color:var(--text-dim)">${tierMap[t].length} variações (enc @0 a @${Math.max(...tierMap[t].map(v => v.enchantment))})</span>
+          </div>
+        </div>
+      `).join('');
+      tierList.querySelectorAll('.card[data-tier]').forEach(el => {
+        el.addEventListener('click', () => showQualities(base, baseName, parseInt(el.dataset.tier), tierMap[parseInt(el.dataset.tier)]));
+      });
+    } catch (e) {
+      grid.innerHTML = `<div class="empty-state"><p>Erro: ${e.message}</p></div>`;
+    }
+  }
+
+  async function showQualities(base, baseName, tier, variants) {
+    const grid = document.getElementById('itemGrid');
+    grid.innerHTML = '<div class="loading">Carregando qualidades...</div>';
+    setBreadcrumb([{ label: baseName }, { label: TIER_NAMES[tier] }]);
+
+    const variantsByEnc = {};
+    variants.forEach(v => {
+      const enc = v.enchantment;
+      if (!variantsByEnc[enc]) variantsByEnc[enc] = [];
+      variantsByEnc[enc].push(v);
+    });
+
+    const encs = Object.keys(variantsByEnc).map(Number).sort((a, b) => a - b);
+
+    grid.style.display = '';
+    grid.innerHTML = `
+      <div style="margin-bottom:0.8rem">
+        <a href="javascript:void(0)" id="backToTiers" style="font-size:0.75rem;color:var(--gold);cursor:pointer">← Voltar a ${baseName}</a>
+      </div>
+      <div class="section-title" style="margin-bottom:0.6rem">${baseName} ${TIER_NAMES[tier]}</div>
+      <div style="display:flex;flex-direction:column;gap:0.5rem" id="encList"></div>
+    `;
+    document.getElementById('backToTiers').addEventListener('click', () => showTiers(base, baseName));
+
+    const encList = document.getElementById('encList');
+    if (encs.length === 1 && encs[0] === 0) {
+      showQualityDetail(variants[0].unique_name, baseName, tier, 0);
+      return;
+    }
+    encList.innerHTML = encs.map(enc => `
+      <div class="card" style="padding:0.7rem;cursor:pointer;transition:border-color 0.15s" data-enc="${enc}">
+        <div style="display:flex;align-items:center;gap:0.6rem">
+          <span style="font-weight:600">${enc > 0 ? `@${enc}` : '@0 (base)'}</span>
+          <span style="font-size:0.75rem;color:var(--text-dim)">${variantsByEnc[enc].length} qualidade(s)</span>
+        </div>
+      </div>
+    `).join('');
+    encList.querySelectorAll('.card[data-enc]').forEach(el => {
+      el.addEventListener('click', () => {
+        const enc = parseInt(el.dataset.enc);
+        const v = variantsByEnc[enc][0];
+        showQualityDetail(v.unique_name, baseName, tier, enc);
+      });
+    });
+  }
+
+  async function showQualityDetail(itemId, baseName, tier, enchantment) {
+    const grid = document.getElementById('itemGrid');
+    grid.innerHTML = '<div class="loading">Carregando preços...</div>';
+    setBreadcrumb([{ label: baseName }, { label: `${TIER_NAMES[tier]}${enchantment > 0 ? ` @${enchantment}` : ''}` }]);
 
     try {
       const [latest, history, itemInfo] = await Promise.all([
@@ -222,54 +268,61 @@ Router.register('/itens', async (app, params) => {
         apiGet(`/api/items/${itemId}`).catch(() => null)
       ]);
 
-      const name = (itemInfo && itemInfo.name_ptbr) || (latest.length && latest[0].name_ptbr) || itemId;
+      const name = (itemInfo && itemInfo.name_ptbr) || baseName;
 
-      pc.innerHTML = `
-        <div>
-          <div style="display:flex;align-items:baseline;gap:0.75rem;margin-bottom:1rem;flex-wrap:wrap">
-            <a href="javascript:void(0)" id="backToList" style="font-size:0.75rem;color:var(--gold);cursor:pointer">← Voltar à lista</a>
-            <h2 style="font-size:1.1rem;font-weight:700">${name}</h2>
-            <span style="font-family:monospace;font-size:0.7rem;color:var(--text-dim)">${itemId}</span>
-            ${itemInfo ? `<span class="badge badge-gold">T${itemInfo.tier || '?'}</span>` : ''}
-            ${itemInfo && itemInfo.enchantment ? `<span class="badge badge-purple">@${itemInfo.enchantment}</span>` : ''}
-            ${itemInfo && itemInfo.category ? `<span class="badge badge-surface">${itemInfo.category}</span>` : ''}
-          </div>
-
-          ${latest.length ? `
-          <div class="card" style="margin-bottom:1rem">
-            <div class="section-title">Preços por Cidade</div>
-            <table class="price-table">
-              <thead><tr><th>Cidade</th><th>Venda min</th><th>Venda max</th><th>Compra min</th><th>Compra max</th><th>Fonte</th><th>Atualizado</th></tr></thead>
-              <tbody>${latest.map(r => `<tr>
-                <td class="city">${r.city}</td>
-                <td class="price">${fmtPrice(r.sell_price_min)}</td>
-                <td class="price">${fmtPrice(r.sell_price_max)}</td>
-                <td class="price">${fmtPrice(r.buy_price_min)}</td>
-                <td class="price">${fmtPrice(r.buy_price_max)}</td>
-                <td><span class="source-badge ${r.source}">${r.source === 'private' ? 'Privado' : 'AODP'}</span></td>
-                <td class="time-ago">${timeAgo(r.observed_at)}</td>
-              </tr>`).join('')}</tbody>
-            </table>
-          </div>` : '<div class="card" style="margin-bottom:1rem;padding:1.5rem;text-align:center;color:var(--text-dim);font-size:0.8rem">Sem dados de preço disponíveis</div>'}
-
-          ${history.length ? `
-          <div class="card" style="margin-bottom:1rem">
-            <div class="section-title">Estatísticas</div>
-            <div class="grid-3" id="detailStats"></div>
-          </div>
-
-          <div class="card">
-            <div class="section-title">Gráfico de Preços</div>
-            <div class="chart-controls" id="detailMetric">
-              <button class="active" data-metric="sell">Venda</button>
-              <button data-metric="buy">Compra</button>
-            </div>
-            <div class="chart-container"><canvas id="detailChart"></canvas></div>
-          </div>` : ''}
+      grid.innerHTML = `
+        <div style="margin-bottom:0.8rem">
+          <a href="javascript:void(0)" id="backToEncs" style="font-size:0.75rem;color:var(--gold);cursor:pointer">← Voltar</a>
         </div>
+        <div style="display:flex;align-items:baseline;gap:0.75rem;margin-bottom:1rem;flex-wrap:wrap">
+          <h2 style="font-size:1.1rem;font-weight:700">${name}</h2>
+          <span style="font-family:monospace;font-size:0.7rem;color:var(--text-dim)">${itemId}</span>
+          ${tierIcon(tier)}
+          ${enchantment > 0 ? `<span class="badge badge-purple">@${enchantment}</span>` : ''}
+        </div>
+
+        ${latest.length ? `
+        <div class="card" style="margin-bottom:1rem">
+          <div class="section-title">Preços por Cidade</div>
+          <table class="price-table">
+            <thead><tr><th>Cidade</th><th>Venda min</th><th>Venda max</th><th>Compra min</th><th>Compra max</th><th>Fonte</th><th>Atualizado</th></tr></thead>
+            <tbody>${latest.map(r => `<tr>
+              <td class="city">${r.city}</td>
+              <td class="price">${fmtPrice(r.sell_price_min)}</td>
+              <td class="price">${fmtPrice(r.sell_price_max)}</td>
+              <td class="price">${fmtPrice(r.buy_price_min)}</td>
+              <td class="price">${fmtPrice(r.buy_price_max)}</td>
+              <td><span class="source-badge ${r.source}">${r.source === 'private' ? 'Privado' : 'AODP'}</span></td>
+              <td class="time-ago">${timeAgo(r.observed_at)}</td>
+            </tr>`).join('')}</tbody>
+          </table>
+        </div>` : '<div class="card" style="margin-bottom:1rem;padding:1.5rem;text-align:center;color:var(--text-dim);font-size:0.8rem">Sem dados de preço disponíveis</div>'}
+
+        ${history.length ? `
+        <div class="card" style="margin-bottom:1rem">
+          <div class="section-title">Estatísticas</div>
+          <div class="grid-3" id="detailStats"></div>
+        </div>
+
+        <div class="card">
+          <div class="section-title">Gráfico de Preços</div>
+          <div class="chart-controls" id="detailMetric">
+            <button class="active" data-metric="sell">Venda</button>
+            <button data-metric="buy">Compra</button>
+          </div>
+          <div class="chart-container"><canvas id="detailChart"></canvas></div>
+        </div>` : ''}
       `;
 
-      document.getElementById('backToList').addEventListener('click', () => showBrowseUI());
+      document.getElementById('backToEncs').addEventListener('click', () => {
+        if (enchantment > 0) {
+          const variantsByEnc = {};
+          const fakeVariants = [{ unique_name: itemId, enchantment }];
+          showQualities(itemId.split('_').slice(0, -1).join('_'), baseName, tier, fakeVariants);
+        } else {
+          showTiers(itemId.replace(/(_\d+)?$/, ''), baseName);
+        }
+      });
 
       if (history.length) {
         const sells = history.filter(h => h.sell_price_min).map(h => h.sell_price_min);
@@ -342,8 +395,7 @@ Router.register('/itens', async (app, params) => {
       }
 
     } catch (e) {
-      pc.innerHTML = `<div class="empty-state"><div class="icon">⚠</div><p>Erro: ${e.message}</p><a href="javascript:void(0)" id="backToList" style="color:var(--gold);font-size:0.75rem;margin-top:0.5rem;display:inline-block">← Voltar à lista</a></div>`;
-      document.getElementById('backToList')?.addEventListener('click', () => showBrowseUI());
+      grid.innerHTML = `<div class="empty-state"><p>Erro: ${e.message}</p></div>`;
     }
   }
 
@@ -351,21 +403,15 @@ Router.register('/itens', async (app, params) => {
     renderTree(e.target.value.trim().toLowerCase());
   });
 
-  bindTierBar();
-  bindItemSearch();
   renderTree();
-  loadItems();
-
-  const searchQ = urlParams.get('q');
-  if (searchQ) {
-    const searchInput = document.getElementById('itemSearch');
-    if (searchInput) {
-      searchInput.value = searchQ;
-      searchInput.dispatchEvent(new Event('input'));
-    }
-  }
 
   if (urlParams.get('item')) {
-    showItemDetail(urlParams.get('item'));
+    const itemId = urlParams.get('item');
+    const parts = itemId.split('_');
+    const tier = parseInt(parts[0]?.replace('T', ''));
+    const baseName = itemId;
+    showQualityDetail(itemId, baseName, tier || 4, 0);
+  } else {
+    loadBases();
   }
 });

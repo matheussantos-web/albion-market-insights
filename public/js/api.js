@@ -30,12 +30,15 @@ async function getCategories() {
   return apiGet('/api/items/categories');
 }
 
-async function getLatestPrices(itemId) {
-  return apiGet(`/api/prices/${itemId}/latest`);
+async function getLatestPrices(itemId, quality) {
+  const q = quality ? `?quality=${quality}` : '';
+  return apiGet(`/api/prices/${itemId}/latest${q}`);
 }
 
-async function getPriceHistory(itemId, limit = 200) {
-  return apiGet(`/api/prices/${itemId}?limit=${limit}`);
+async function getPriceHistory(itemId, limit = 200, quality) {
+  const params = new URLSearchParams({ limit });
+  if (quality) params.set('quality', quality);
+  return apiGet(`/api/prices/${itemId}?${params}`);
 }
 
 async function fetchFromAodp(itemId) {
@@ -44,4 +47,17 @@ async function fetchFromAodp(itemId) {
 
 async function syncWatchlist() {
   return apiPost('/api/sync/watchlist-sync');
+}
+
+async function getItemBases(category, search) {
+  let url = '/api/items/bases';
+  const params = new URLSearchParams();
+  if (category) params.set('category', category);
+  if (search) params.set('search', search);
+  if (params.toString()) url += `?${params}`;
+  return apiGet(url);
+}
+
+async function getItemVariants(base) {
+  return apiGet(`/api/items/variants?base=${encodeURIComponent(base)}`);
 }

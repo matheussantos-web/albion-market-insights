@@ -69,6 +69,57 @@ router.get('/categories', (req, res) => {
   res.json(rows);
 });
 
+// GET /api/items/bases?category=Bolsas — lista item base únicos de uma categoria
+router.get('/bases', (req, res) => {
+  const db = getDb();
+  const { category, search } = req.query;
+
+  let query = `
+    SELECT item_base,
+           MIN(name_ptbr) AS name_ptbr,
+           category,
+           GROUP_CONCAT(DISTINCT tier) AS tiers,
+           COUNT(DISTINCT unique_name) AS variant_count
+    FROM items
+    WHERE item_base IS NOT NULL
+  `;
+  const params = [];
+
+  if (category) {
+    query += ' AND category = ?';
+    params.push(category);
+  }
+  if (search) {
+    query += ' AND (name_ptbr LIKE ? OR item_base LIKE ?)';
+    params.push(`%${search}%`, `%${search}%`);
+  }
+
+  query += ' GROUP BY item_base ORDER BY name_ptbr ASC LIMIT 300';
+  const rows = db.prepare(query).all(...params);
+
+  const result = rows.map(r => ({
+    ...r,
+    tiers: r.tiers ? r.tiers.split(',').map(Number).sort((a, b) => a - b) : [],
+  }));
+
+  res.json(result);
+});
+
+// GET /api/items/variants?base=BAG — lista variantes (tier+encantamento) de um item base
+router.get('/variants', (req, res) => {
+  const db = getDb();
+  const { base } = req.query;
+  if (!base) return res.status(400).json({ error: 'base é obrigatório' });
+
+  const rows = db.prepare(
+    `SELECT unique_name, name_ptbr, tier, enchantment, category
+     FROM items WHERE item_base = ?
+     ORDER BY tier ASC, enchantment ASC`
+  ).all(base);
+
+  res.json(rows);
+});
+
 // GET /api/items/:uniqueName
 router.get('/:uniqueName', (req, res) => {
   const db = getDb();
