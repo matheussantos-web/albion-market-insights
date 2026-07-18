@@ -4,10 +4,11 @@ const { Cap, decoders } = require('cap');
 const { PROTOCOL } = decoders;
 const network = require('network');
 const fetch = require('node-fetch');
-const { parsePhotonPacket, setDebug, getCurrentLocation } = require('./photon');
+const { parsePhotonPacket, setDebug, getCurrentLocation, getDiag, PHOTON_VERSION } = require('./photon');
 
 const SERVER = 'http://191.252.219.229:3000';
 const DEBUG = process.env.DEBUG === '1';
+const CLIENT_VERSION = '4.0.1-diag';
 
 function log(msg) { console.log(`[ami-client] ${msg}`); }
 function logError(msg) { console.error(`[ami-client] ERRO: ${msg}`); }
@@ -80,15 +81,18 @@ class BatchSender {
 function main() {
   const sender = new BatchSender();
 
-  log('---');
-  log('Albion Market Insights - Cliente v4.0 (AODP Architecture)');
-  log('---');
+  log('========================================');
+  log(`VERSION: ${CLIENT_VERSION} | PHOTON: ${PHOTON_VERSION}`);
+  log('========================================');
+  log('Albion Market Insights - Cliente v4.0.1 (AODP Architecture)');
+  log('========================================');
   log('Iniciando captura de pacotes...');
   log('Abra o Albion Online e visite o mercado.');
   log('A cidade sera detectada automaticamente.');
   log('Pressione Ctrl+C para sair.');
   log('');
   if (DEBUG) log('MODO DEBUG ATIVADO');
+  log('DIAGNOSTICOS ATIVOS: [hex] [diag] [raw]');
 
   const cap = new Cap();
   const buffer = Buffer.alloc(65535);
@@ -114,6 +118,8 @@ function main() {
     let pktCount = 0;
     let parsedCount = 0;
     let foundCount = 0;
+    const portStats = { src5056: 0, dst5056: 0, both: 0 };
+    const ipStats = {};
 
     cap.on('packet', (nBytes) => {
       pktCount++;
@@ -122,13 +128,39 @@ function main() {
       let ret = decoders.Ethernet(buffer);
       if (ret.info.type !== PROTOCOL.ETHERNET.IPV4) return;
 
+      const srcIp = ret.info.srcaddr;
+      const dstIp = ret.info.dstaddr;
+
       ret = decoders.IPV4(buffer, ret.offset);
       if (ret.info.protocol !== PROTOCOL.IP.UDP) return;
 
       ret = decoders.UDP(buffer, ret.offset);
       if (ret.info.srcport != 5056 && ret.info.dstport != 5056) return;
 
+      const srcPort = ret.info.srcport;
+      const dstPort = ret.info.dstport;
       const payload = buffer.slice(ret.offset, ret.offset + ret.info.length);
+
+      // Track port direction
+      if (srcPort == 5056 && dstPort == 5056) {
+        portStats.both++;
+      } else if (srcPort == 5056) {
+        portStats.src5056++;
+      } else if (dstPort == 5056) {
+        portStats.dst5056++;
+      }
+
+      // Track IPs
+      const ipKey = `${srcIp}->${dstIp}`;
+      ipStats[ipKey] = (ipStats[ipKey] || 0) + 1;
+
+      // First 10 packets: full raw hex + direction
+      if (pktCount <= 10) {
+        const dir = srcPort == 5056 ? 'SRV->CLI' : (dstPort == 5056 ? 'CLI->SRV' : '???');
+        const rawHex = Array.from(payload.slice(0, 60)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+        console.log(`[raw] pkt#${pktCount} ${dir} ${srcIp}:${srcPort} -> ${dstIp}:${dstPort} len=${payload.length} nBytes=${nBytes}`);
+        console.log(`[raw]   hex: ${rawHex}`);
+      }
 
       try {
         const items = parsePhotonPacket(payload);
@@ -142,15 +174,31 @@ function main() {
           }
         }
       } catch (e) {
-        // Ignore unparseable packets
+        if (pktCount <= 10) console.log(`[raw]   DECODE ERROR: ${e.message}`);
       }
     });
 
     setInterval(() => {
       const s = sender.getStats();
       const loc = getCurrentLocation();
+      const d = getDiag();
       if (pktCount > 0) {
-        log(`Stats: ${pktCount} pkts, ${foundCount} itens, ${s.items} enviados | Cidade: ${loc.name}`);
+        log('========================================');
+        log(`VERSION: ${CLIENT_VERSION} | PHOTON: ${PHOTON_VERSION}`);
+        log('========================================');
+        log(`--- Stats ---`);
+        log(`Packets: ${pktCount} total, ${parsedCount} parsed`);
+        log(`Port dir: src5056=${portStats.src5056} dst5056=${portStats.dst5056} both=${portStats.both}`);
+        log(`IPs: ${JSON.stringify(ipStats)}`);
+        log(`Cmd types: ${JSON.stringify(d.cmdTypes || {})} (total=${d.cmdTotal || 0} skipped=${d.cmdSkipped || 0})`);
+        log(`Msg types: ${JSON.stringify(d.msgTypes || {})}`);
+        log(`OpCodes seen: ${JSON.stringify(d.opCodes || {})}`);
+        log(`Event codes: ${JSON.stringify(d.evtCodes || {})}`);
+        log(`Errors: ${(d.errs || []).slice(0, 5).join('; ') || 'none'}`);
+        log(`Msgs decoded: ${d.seen || 0}`);
+        log(`Itens: ${foundCount} found, ${s.items} sent`);
+        log(`City: ${loc.name} (${loc.id})`);
+        log(`---`);
       }
     }, 15000);
   });
