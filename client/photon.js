@@ -259,69 +259,53 @@ function decodeValue(stream, typeCode) {
         return [{ custom: true, typeId, data: Array.from(data) }, true];
       }
 
-      // CustomTypeSlim (128+): type ID embedded in type code, short BE length + data
+      // Container types
+      case TYPE.HASHTABLE:
+        return decodeHashtable(stream);
+      case TYPE.DICTIONARY:
+        return decodeDictionary(stream);
+      case TYPE.OBJECT_ARRAY:
+      case TYPE.ARRAY:
+        return decodeObjectArray(stream);
+
+      // Typed array types
+      case TYPE.BYTE_ARRAY:
+        return decodeByteArray(stream);
+      case TYPE.SHORT_ARRAY:
+        return decodeShortArray(stream);
+      case TYPE.INT_ARRAY:
+        return decodeIntArray(stream);
+      case TYPE.FLOAT_ARRAY:
+        return decodeFloatArray(stream);
+      case TYPE.DOUBLE_ARRAY:
+        return decodeDoubleArray(stream);
+      case TYPE.STRING_ARRAY:
+        return decodeStringArray(stream);
+      case TYPE.BOOLEAN_ARRAY:
+        return decodeBooleanArray(stream);
+      case TYPE.COMPRESSED_INT_ARRAY:
+        return decodeCompressedIntArray(stream);
+      case TYPE.COMPRESSED_LONG_ARRAY:
+        return decodeCompressedLongArray(stream);
+      case TYPE.HASHTABLE_ARRAY:
+        return decodeHashtableArray(stream);
+      case TYPE.DICTIONARY_ARRAY:
+        return decodeDictionaryArray(stream);
+      case TYPE.CUSTOM_TYPE_ARRAY:
+        return decodeCustomTypeArray(stream);
+
       default:
         if (typeCode >= TYPE.CUSTOM_TYPE_SLIM) {
           const typeId = typeCode - TYPE.CUSTOM_TYPE_SLIM;
-          // Read short (2 bytes LE) for payload length, then payload
           const len = stream.readUint16LE();
           const data = stream.readBytes(len);
           return [{ custom: true, typeId, data: Array.from(data) }, true];
         }
-        // Unknown type
         return [null, false];
-    }
-
-    // Array types (handled separately below)
-    if (typeCode === TYPE.ARRAY || typeCode === TYPE.OBJECT_ARRAY) {
-      return decodeObjectArray(stream);
-    }
-    if (typeCode === TYPE.BYTE_ARRAY) {
-      return decodeByteArray(stream);
-    }
-    if (typeCode === TYPE.SHORT_ARRAY) {
-      return decodeShortArray(stream);
-    }
-    if (typeCode === TYPE.INT_ARRAY) {
-      return decodeIntArray(stream);
-    }
-    if (typeCode === TYPE.FLOAT_ARRAY) {
-      return decodeFloatArray(stream);
-    }
-    if (typeCode === TYPE.DOUBLE_ARRAY) {
-      return decodeDoubleArray(stream);
-    }
-    if (typeCode === TYPE.STRING_ARRAY) {
-      return decodeStringArray(stream);
-    }
-    if (typeCode === TYPE.BOOLEAN_ARRAY) {
-      return decodeBooleanArray(stream);
-    }
-    if (typeCode === TYPE.COMPRESSED_INT_ARRAY) {
-      return decodeCompressedIntArray(stream);
-    }
-    if (typeCode === TYPE.COMPRESSED_LONG_ARRAY) {
-      return decodeCompressedLongArray(stream);
-    }
-    if (typeCode === TYPE.HASHTABLE) {
-      return decodeHashtable(stream);
-    }
-    if (typeCode === TYPE.DICTIONARY) {
-      return decodeDictionary(stream);
-    }
-    if (typeCode === TYPE.HASHTABLE_ARRAY) {
-      return decodeHashtableArray(stream);
-    }
-    if (typeCode === TYPE.DICTIONARY_ARRAY) {
-      return decodeDictionaryArray(stream);
-    }
-    if (typeCode === TYPE.CUSTOM_TYPE_ARRAY) {
-      return decodeCustomTypeArray(stream);
     }
   } catch (e) {
     return [null, false];
   }
-  return [null, false];
 }
 
 // ── Array decoders ──
@@ -526,14 +510,16 @@ const MAX_FRAG_AGE_MS = 10000;
 function decodeMessage(msgPayload) {
   if (msgPayload.remaining() < 2) return null;
   msgPayload.skip(1); // padding/signifier byte
-  const msgType = msgPayload.readByte();
+  const rawMsgType = msgPayload.readByte();
+  const msgType = rawMsgType & 0x7F; // mask off flag bits (0x80 = encryption/compression flag)
+  const hasFlag = (rawMsgType & 0x80) !== 0;
 
   if (msgType === 3) {
-    return { type: 'opResponse', data: decodeOperationResponse(msgPayload) };
+    return { type: 'opResponse', data: decodeOperationResponse(msgPayload), hasFlag };
   } else if (msgType === 4) {
-    return { type: 'event', data: decodeEvent(msgPayload) };
+    return { type: 'event', data: decodeEvent(msgPayload), hasFlag };
   }
-  dbg(`    unknown msgType=${msgType}`);
+  dbg(`    unknown rawMsgType=${rawMsgType} (msgType=${msgType}, flag=${hasFlag})`);
   return null;
 }
 
@@ -544,6 +530,9 @@ function handleMessage(msg, results) {
     const resp = msg.data;
     const paramKeys = Object.keys(resp.params);
     dbg(`    opResponse: code=${resp.opCode} returnCode=${resp.returnCode} params(${paramKeys.length})=[${paramKeys.join(',')}]`);
+    if (paramKeys.length > 0 && paramKeys.length <= 5) {
+      dbg(`    opResponse detail: ${JSON.stringify(resp.params).substring(0, 400)}`);
+    }
     if (AUCTION_OPS.has(resp.opCode)) {
       dbg(`    >>> AUCTION OP ${resp.opCode}! Extracting data...`);
       extractAuctionData(resp.params, results);
@@ -551,12 +540,10 @@ function handleMessage(msg, results) {
   } else if (msg.type === 'event') {
     const evt = msg.data;
     const paramKeys = Object.keys(evt.params);
-    if (evt.code !== 1 && evt.code !== 3) {
-      dbg(`    event: code=${evt.code} params(${paramKeys.length})=[${paramKeys.join(',')}]`);
-      if (paramKeys.length > 0) {
-        const preview = JSON.stringify(evt.params).substring(0, 300);
-        dbg(`    event preview: ${preview}`);
-      }
+    dbg(`    event: code=${evt.code} params(${paramKeys.length})=[${paramKeys.join(',')}]${msg.hasFlag ? ' [encrypted]' : ''}`);
+    if (paramKeys.length > 0 && evt.code !== 1 && evt.code !== 3) {
+      const preview = JSON.stringify(evt.params).substring(0, 400);
+      dbg(`    event detail: ${preview}`);
     }
     if (evt.code === MARKET_EVENT) {
       dbg(`    >>> MARKET EVENT ${evt.code}! Extracting data...`);
