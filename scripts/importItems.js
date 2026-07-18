@@ -38,7 +38,7 @@ function parseCategory(uniqueName) {
   if (/^T\d_(MAIN_CROSSBOW|2H_CROSSBOW)/.test(u)) return 'Bestas';
   if (/^T\d_(MAIN_DAGGER|2H_DAGGER)/.test(u)) return 'Adagas';
 
-  // ── Cajados (Mago) ──
+  // ── Cajados (Mago) — padrões específicos ──
   if (/^T\d_(MAIN_FIRESTAFF|2H_FIRESTAFF)/.test(u)) return 'Cajados de Fogo';
   if (/^T\d_(MAIN_HOLYSTAFF|2H_HOLYSTAFF)/.test(u)) return 'Cajados Sagrados';
   if (/^T\d_(MAIN_ARCANESTAFF|2H_ARCANESTAFF)/.test(u)) return 'Cajados Arcanos';
@@ -46,7 +46,32 @@ function parseCategory(uniqueName) {
   if (/^T\d_(MAIN_CURSEDSTAFF|2H_CURSEDSTAFF)/.test(u)) return 'Cajados Amaldicoados';
   if (/^T\d_(MAIN_NATURESTAFF|2H_NATURESTAFF)/.test(u)) return 'Cajados da Natureza';
 
-  // ── Outras armas ──
+  // ── Artefatos (materiais de crafting, não são armas) — antes dos catch-alls amplos ──
+  if (/ARTEFACT_/.test(u)) return 'Outros';
+
+  // ── Armas corpo a corpo — padrões amplos (variantes Morgana/Hell/Keeper/Avalon/Crystal) ──
+  if (/_DUALSWORD|_CLAYMORE/.test(u)) return 'Espadas';
+  if (/_DOUBLEAXE|_BATTLEAXE/.test(u)) return 'Machados';
+  if (/_HEAVYMACE/.test(u)) return 'Macas';
+  if (/_PIKE|_SPEAR/.test(u)) return 'Lancas';
+  if (/_ROCK|_WARHAMMER|_HAMMER/.test(u)) return 'Martelos';
+  if (/_CLAW/.test(u)) return 'Luvas de Guerra';
+
+  // ── Armas à distância — padrões amplos ──
+  if (/_LONGBOW|_BOW/.test(u)) return 'Arcos';
+  if (/_HEAVYCROSSBOW|_CROSSBOW/.test(u)) return 'Bestas';
+  if (/_DAGGER/.test(u)) return 'Adagas';
+  if (/_QUARRELSTAFF|_TALISMAN/.test(u)) return 'Quarterstaffs';
+
+  // ── Cajados — padrões amplos (variantes Morgana/Hell/Keeper/Avalon/Crystal) ──
+  if (/FIRESTAFF|INFERNOSTAFF|FLAMESTAFF|DEMONFIRESTAFF/.test(u)) return 'Cajados de Fogo';
+  if (/HOLYSTAFF|LIFETOUCHSTAFF/.test(u)) return 'Cajados Sagrados';
+  if (/ARCANESTAFF|ENIGMATICSTAFF/.test(u)) return 'Cajados Arcanos';
+  if (/FROSTSTAFF|ICESTAFF/.test(u)) return 'Cajados de Gelo';
+  if (/CURSEDSTAFF|DEMONSCYTHESTAFF/.test(u)) return 'Cajados Amaldicoados';
+  if (/NATURESTAFF|WILDSTAFF/.test(u)) return 'Cajados da Natureza';
+
+  // ── Outras armas (padrões específicos) ──
   if (/^T\d_2H_QUARRELSTAFF/.test(u)) return 'Quarterstaffs';
   if (/^T\d_MAIN_QUARRELSTAFF/.test(u)) return 'Quarterstaffs';
   if (/^T\d_2H_TALISMAN/.test(u)) return 'Talismas';
