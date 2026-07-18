@@ -4,14 +4,19 @@ const { Cap, decoders } = require('cap');
 const { PROTOCOL } = decoders;
 const network = require('network');
 const fetch = require('node-fetch');
+const fs = require('fs');
+const path = require('path');
 const { parsePhotonPacket, setDebug, getCurrentLocation, getDiag, PHOTON_VERSION } = require('./photon');
 
 const SERVER = 'http://191.252.219.229:3000';
-const DEBUG = process.env.DEBUG === '1';
-const CLIENT_VERSION = '4.0.1-diag';
+const CLIENT_VERSION = '4.0.2-logfile';
+const LOG_FILE = path.join(__dirname, 'debug.log');
 
-function log(msg) { console.log(`[ami-client] ${msg}`); }
-function logError(msg) { console.error(`[ami-client] ERRO: ${msg}`); }
+function logToConsole(msg) { process.stdout.write(msg + '\n'); }
+function logError(msg) { process.stderr.write(`ERRO: ${msg}\n`); }
+function logFile(msg) {
+  try { fs.appendFileSync(LOG_FILE, msg + '\n'); } catch(e) {}
+}
 
 // ── Batch sender ──
 class BatchSender {
@@ -20,7 +25,6 @@ class BatchSender {
     this.batchInterval = 5000;
     this.maxBatchSize = 100;
     this.stats = { received: 0, sent: 0, errors: 0, items: 0 };
-
     setInterval(() => this.flush(), this.batchInterval);
   }
 
@@ -36,16 +40,12 @@ class BatchSender {
       timestamp: new Date().toISOString(),
     });
     this.stats.received++;
-
-    if (this.buffer.length >= this.maxBatchSize) {
-      this.flush();
-    }
+    if (this.buffer.length >= this.maxBatchSize) this.flush();
   }
 
   async flush() {
     if (this.buffer.length === 0) return;
     const batch = this.buffer.splice(0, this.maxBatchSize);
-
     try {
       const res = await fetch(`${SERVER}/api/ingest`, {
         method: 'POST',
@@ -53,7 +53,6 @@ class BatchSender {
         body: JSON.stringify(batch),
         timeout: 10000,
       });
-
       if (!res.ok) {
         const text = await res.text();
         logError(`Servidor ${res.status}: ${text}`);
@@ -61,7 +60,6 @@ class BatchSender {
         this.buffer.unshift(...batch);
         return;
       }
-
       this.stats.sent++;
       this.stats.items += batch.length;
       log(`${batch.length} registros enviados (total: ${this.stats.items})`);
@@ -72,48 +70,38 @@ class BatchSender {
     }
   }
 
-  getStats() {
-    return this.stats;
-  }
+  getStats() { return this.stats; }
 }
 
 // ── Main ──
 function main() {
+  // Clear old log
+  try { fs.writeFileSync(LOG_FILE, ''); } catch(e) {}
+
   const sender = new BatchSender();
 
-  log('========================================');
-  log(`VERSION: ${CLIENT_VERSION} | PHOTON: ${PHOTON_VERSION}`);
-  log('========================================');
-  log('Albion Market Insights - Cliente v4.0.1 (AODP Architecture)');
-  log('========================================');
-  log('Iniciando captura de pacotes...');
-  log('Abra o Albion Online e visite o mercado.');
-  log('A cidade sera detectada automaticamente.');
-  log('Pressione Ctrl+C para sair.');
-  log('');
-  if (DEBUG) log('MODO DEBUG ATIVADO');
-  log('DIAGNOSTICOS ATIVOS: [hex] [diag] [raw]');
+  logToConsole(`AMI Client ${CLIENT_VERSION} | Photon ${PHOTON_VERSION}`);
+  logToConsole('Capturando pacotes UDP 5056...');
+  logToConsole('Abra o Albion e va ao mercado. Ctrl+C para sair.');
+  logToConsole('');
 
   const cap = new Cap();
   const buffer = Buffer.alloc(65535);
 
   network.get_active_interface((err, obj) => {
-    if (err) {
-      logError('Não foi possível encontrar rede ativa.');
-      process.exit(1);
-    }
+    if (err) { logToConsole('Rede nao encontrada.'); process.exit(1); }
 
     const device = Cap.findDevice(obj.ip_address);
     const filter = 'udp and (dst port 5056 or src port 5056)';
     const bufSize = 10 * 1024 * 1024;
-
     const linkType = cap.open(device, filter, bufSize, buffer);
     cap.setMinBytes && cap.setMinBytes(0);
 
-    log(`Rede: ${obj.ip_address}`);
-    log(`Filtrando pacotes UDP na porta 5056...`);
-    log('');
-    setDebug(DEBUG);
+    logToConsole(`Rede: ${obj.ip_address}`);
+    logToConsole(`Log completo: ${LOG_FILE}`);
+    logToConsole('');
+
+    setDebug(false);
 
     let pktCount = 0;
     let parsedCount = 0;
@@ -141,26 +129,17 @@ function main() {
       const dstPort = ret.info.dstport;
       const payload = buffer.slice(ret.offset, ret.offset + ret.info.length);
 
-      // Track port direction
-      if (srcPort == 5056 && dstPort == 5056) {
-        portStats.both++;
-      } else if (srcPort == 5056) {
-        portStats.src5056++;
-      } else if (dstPort == 5056) {
-        portStats.dst5056++;
-      }
+      if (srcPort == 5056 && dstPort == 5056) portStats.both++;
+      else if (srcPort == 5056) portStats.src5056++;
+      else if (dstPort == 5056) portStats.dst5056++;
 
-      // Track IPs
-      const ipKey = `${srcIp}->${dstIp}`;
+      const ipKey = `${srcIp}:${srcPort}->${dstIp}:${dstPort}`;
       ipStats[ipKey] = (ipStats[ipKey] || 0) + 1;
 
-      // First 10 packets: full raw hex + direction
-      if (pktCount <= 10) {
-        const dir = srcPort == 5056 ? 'SRV->CLI' : (dstPort == 5056 ? 'CLI->SRV' : '???');
-        const rawHex = Array.from(payload.slice(0, 60)).map(b => b.toString(16).padStart(2, '0')).join(' ');
-        console.log(`[raw] pkt#${pktCount} ${dir} ${srcIp}:${srcPort} -> ${dstIp}:${dstPort} len=${payload.length} nBytes=${nBytes}`);
-        console.log(`[raw]   hex: ${rawHex}`);
-      }
+      // Log ALL packet details to file
+      const dir = srcPort == 5056 ? 'SRV->CLI' : 'CLI->SRV';
+      logFile(`=== PKT#${pktCount} ${dir} ${srcIp}:${srcPort}->${dstIp}:${dstPort} len=${payload.length} ===`);
+      logFile(`HEX: ${Array.from(payload.slice(0, 80)).map(b => b.toString(16).padStart(2, '0')).join(' ')}`);
 
       try {
         const items = parsePhotonPacket(payload);
@@ -170,11 +149,12 @@ function main() {
           for (const { itemId, price, quality, locationName, amount, auctionType } of items) {
             sender.addItem(itemId, price, quality, locationName);
             const tag = auctionType === 'request' ? '[COMPRAR]' : '[VENDER]';
-            log(`${tag} ${itemId} = ${price} silver x${amount} (${locationName})`);
+            logToConsole(`${tag} ${itemId} = ${price} silver x${amount} (${locationName})`);
+            logFile(`${tag} ${itemId} = ${price} silver x${amount} (${locationName})`);
           }
         }
       } catch (e) {
-        if (pktCount <= 10) console.log(`[raw]   DECODE ERROR: ${e.message}`);
+        logFile(`DECODE ERROR: ${e.message}`);
       }
     });
 
@@ -183,27 +163,28 @@ function main() {
       const loc = getCurrentLocation();
       const d = getDiag();
       if (pktCount > 0) {
-        log('========================================');
-        log(`VERSION: ${CLIENT_VERSION} | PHOTON: ${PHOTON_VERSION}`);
-        log('========================================');
-        log(`--- Stats ---`);
-        log(`Packets: ${pktCount} total, ${parsedCount} parsed`);
-        log(`Port dir: src5056=${portStats.src5056} dst5056=${portStats.dst5056} both=${portStats.both}`);
-        log(`IPs: ${JSON.stringify(ipStats)}`);
-        log(`Cmd types: ${JSON.stringify(d.cmdTypes || {})} (total=${d.cmdTotal || 0} skipped=${d.cmdSkipped || 0})`);
-        log(`Msg types: ${JSON.stringify(d.msgTypes || {})}`);
-        log(`OpCodes seen: ${JSON.stringify(d.opCodes || {})}`);
-        log(`Event codes: ${JSON.stringify(d.evtCodes || {})}`);
-        log(`Errors: ${(d.errs || []).slice(0, 5).join('; ') || 'none'}`);
-        log(`Msgs decoded: ${d.seen || 0}`);
-        log(`Itens: ${foundCount} found, ${s.items} sent`);
-        log(`City: ${loc.name} (${loc.id})`);
-        log(`---`);
+        logToConsole('--- Stats ---');
+        logToConsole(`Pacotes: ${pktCount} (parsed: ${parsedCount})`);
+        logToConsole(`Dir: srv->cli=${portStats.src5056} cli->srv=${portStats.dst5056} both=${portStats.both}`);
+        logToConsole(`Cmds: ${JSON.stringify(d.cmdTypes||{})} (total=${d.cmdTotal||0} skip=${d.cmdSkipped||0})`);
+        logToConsole(`Msgs: ${JSON.stringify(d.msgTypes||{})} decoded=${d.seen||0}`);
+        logToConsole(`OpCodes: ${JSON.stringify(d.opCodes||{})}`);
+        logToConsole(`Events: ${JSON.stringify(d.evtCodes||{})}`);
+        logToConsole(`Erros: ${(d.errs||[]).slice(0,3).join('; ')||'nenhum'}`);
+        logToConsole(`Itens: ${foundCount} found, ${s.items} sent`);
+        logToConsole(`Cidade: ${loc.name} (${loc.id})`);
+        logToConsole(`Log: ${LOG_FILE}`);
+        logToConsole('---');
       }
     }, 15000);
   });
 
-  process.on('SIGINT', () => { sender.flush().then(() => process.exit(0)); });
+  process.on('SIGINT', () => {
+    const d = getDiag();
+    logToConsole(`Final: ${JSON.stringify(d)}`);
+    logFile(`Final: ${JSON.stringify(d)}`);
+    sender.flush().then(() => process.exit(0));
+  });
   process.on('SIGTERM', () => { sender.flush().then(() => process.exit(0)); });
 }
 
