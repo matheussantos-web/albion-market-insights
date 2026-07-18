@@ -10,7 +10,6 @@ CREATE TABLE IF NOT EXISTS items (
   item_base     TEXT,
   updated_at    TEXT DEFAULT (datetime('now'))
 );
-CREATE INDEX IF NOT EXISTS idx_items_base ON items(item_base);
 
 -- Cidades/mercados
 CREATE TABLE IF NOT EXISTS locations (
