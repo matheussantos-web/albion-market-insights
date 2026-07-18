@@ -178,13 +178,13 @@ const JOIN_OP = 2;
 // MarketPlaceNotification event code — found in params[252]
 const MARKET_EVENT = 183;
 
-const SENTINELS = new Set([999999, 1000000, 9999999, 99999999, 2147483647, 0]);
-const MAX_PRICE = 50000000;
+const SENTINELS_RAW = new Set([0]);
+const MAX_PRICE_RAW = 500000000000; // 50M silver after ÷10000 normalization
 
 function isSentinel(v) {
   if (!v || v <= 0) return true;
-  if (SENTINELS.has(v)) return true;
-  if (v > MAX_PRICE) return true;
+  if (SENTINELS_RAW.has(v)) return true;
+  if (v > MAX_PRICE_RAW) return true;
   return false;
 }
 
@@ -198,6 +198,14 @@ const LOCATION_NAMES = {
   3008: 'Martlock',
   3009: 'Thetford',
   499:  'Black Market',
+  1:    'Blue City',
+  2:    'Green City',
+  3:    'Red City',
+  4:    'Yellow City',
+  1000: 'Forest Dungeon',
+  1100: 'Roads of Avalon',
+  2000: 'Mists',
+  2301: 'Mists Outpost',
 };
 
 let _currentLocationId = 3004; // default Caerleon
@@ -723,10 +731,13 @@ function extractMarketOrders(stringArray, opCode, results) {
       // Strip enchantment suffix from item ID (e.g. "T4_BAG@3" -> "T4_BAG")
       const cleanItemId = itemId.replace(/@\d+$/, '');
 
+      // Game sends prices multiplied by 10000 — normalize
+      const normalizedPrice = Math.round(Number(price) / 10000);
+
       results.push({
         itemId: cleanItemId,
         quality,
-        price: Number(price),
+        price: normalizedPrice,
         amount,
         auctionType,
         locationId: locationId || loc.id,
@@ -778,10 +789,12 @@ function extractAuctionData(params, opCode, results) {
 
       if (itemId && typeof itemId === 'string' && price && !isSentinel(price)) {
         const loc = getCurrentLocation();
+        // Game sends prices multiplied by 10000 — normalize
+        const normalizedPrice = Math.round(Number(price) / 10000);
         results.push({
           itemId: itemId.replace(/@\d+$/, ''),
           quality: typeof quality === 'number' ? quality : 1,
-          price: Number(price),
+          price: normalizedPrice,
           amount: typeof amount === 'number' ? amount : 1,
           auctionType,
           locationId: loc.id,
@@ -807,6 +820,7 @@ function extractRawFragmentData(data, results) {
   const loc = getCurrentLocation();
   let count = 0;
   let pos = 0;
+  const seen = new Set(); // dedup within fragment
 
   while (pos < text.length) {
     const start = text.indexOf('{', pos);
@@ -832,28 +846,38 @@ function extractRawFragmentData(data, results) {
     }
 
     if (end === -1) break;
-    if (end - start < 20) { pos = end + 1; continue; } // too small to be a market order
+    if (end - start < 20) { pos = end + 1; continue; }
 
     const jsonStr = text.substring(start, end + 1);
     try {
       const obj = JSON.parse(jsonStr);
 
       const itemId = obj.ItemTypeId || obj.itemTypeId;
-      const price = obj.UnitPriceSilver || obj.unitPrice || obj.price;
+      const rawPrice = obj.UnitPriceSilver || obj.unitPrice || obj.price;
 
-      if (itemId && price && !isSentinel(price)) {
-        results.push({
-          itemId: (itemId || '').replace(/@\d+$/, ''),
-          quality: obj.QualityLevel || obj.quality || 1,
-          price: Number(price),
-          amount: obj.Amount || obj.amount || 1,
-          auctionType: obj.AuctionType || obj.auctionType || 'offer',
-          locationId: obj.LocationId || loc.id,
-          locationName: getLocationName(obj.LocationId || loc.id),
-          enchant: obj.EnchantmentLevel || 0,
-          source: 'frag_raw',
-        });
-        count++;
+      if (itemId && rawPrice && !isSentinel(rawPrice)) {
+        const cleanId = (itemId || '').replace(/@\d+$/, '');
+        const quality = obj.QualityLevel || obj.quality || 1;
+        const auctionType = obj.AuctionType || obj.auctionType || 'offer';
+        const orderKey = `${cleanId}|${quality}|${auctionType}`;
+
+        if (!seen.has(orderKey)) {
+          seen.add(orderKey);
+          // Game sends prices multiplied by 10000 — normalize
+          const normalizedPrice = Math.round(Number(rawPrice) / 10000);
+          results.push({
+            itemId: cleanId,
+            quality,
+            price: normalizedPrice,
+            amount: obj.Amount || obj.amount || 1,
+            auctionType,
+            locationId: obj.LocationId || loc.id,
+            locationName: getLocationName(obj.LocationId || loc.id),
+            enchant: obj.EnchantmentLevel || 0,
+            source: 'frag_raw',
+          });
+          count++;
+        }
       }
     } catch (e) { }
 
@@ -1049,4 +1073,4 @@ function parsePhotonPacket(payload) {
 
 function setDebug(on) { _debug = on; }
 
-module.exports = { parsePhotonPacket, setDebug, isSentinel, SENTINELS, MAX_PRICE, getCurrentLocation, getLocationName, LOCATION_NAMES, getDiag, resetDiag, PHOTON_VERSION };
+module.exports = { parsePhotonPacket, setDebug, isSentinel, SENTINELS_RAW, MAX_PRICE_RAW, getCurrentLocation, getLocationName, LOCATION_NAMES, getDiag, resetDiag, PHOTON_VERSION };

@@ -16,13 +16,17 @@ function isSentinel(v) {
 /**
  * POST /api/ingest
  * Accepts anonymous market data from any client.
+ * No item validation — game server is the authority (AODP approach).
+ * Auto-creates unknown locations.
  */
 router.post('/', (req, res) => {
   const payload = Array.isArray(req.body) ? req.body : [req.body];
   const db = getDb();
 
   const getLocationId = db.prepare('SELECT id FROM locations WHERE name = ?');
-  const getItemExists = db.prepare('SELECT 1 FROM items WHERE unique_name = ?');
+  const insertLocation = db.prepare('INSERT OR IGNORE INTO locations (name) VALUES (?)');
+  const getInsertedLocation = db.prepare('SELECT id FROM locations WHERE name = ?');
+
   const insertPrice = db.prepare(`
     INSERT INTO market_prices
       (item_unique_name, location_id, quality, sell_price_min, sell_price_max,
@@ -34,13 +38,19 @@ router.post('/', (req, res) => {
   const insertMany = db.transaction((rows) => {
     let inserted = 0;
     let rejected = 0;
+    let skippedLocation = 0;
+    let skippedSentinel = 0;
+
     for (const row of rows) {
-      const location = getLocationId.get(row.city);
-      if (!location) continue;
+      let location = getLocationId.get(row.city);
 
-      if (isSentinel(row.sellPriceMin)) { rejected++; continue; }
+      if (!location) {
+        insertLocation.run(row.city);
+        location = getInsertedLocation.get(row.city);
+        if (!location) { skippedLocation++; continue; }
+      }
 
-      if (!getItemExists.get(row.itemId)) continue;
+      if (isSentinel(row.sellPriceMin)) { skippedSentinel++; continue; }
 
       insertPrice.run({
         item_unique_name: row.itemId,
@@ -55,7 +65,10 @@ router.post('/', (req, res) => {
       });
       inserted += 1;
     }
-    if (rejected > 0) console.log(`[ingest] ${rejected} registros rejeitados (sentinel values)`);
+
+    if (skippedLocation > 0 || skippedSentinel > 0) {
+      console.log(`[ingest] inseridos: ${inserted}, loc_skip: ${skippedLocation}, sentinel_skip: ${skippedSentinel}`);
+    }
     return inserted;
   });
 
