@@ -10,19 +10,9 @@ const SERVER = 'http://191.252.219.229:3000';
 function log(msg) { console.log(`[ami-client] ${msg}`); }
 function logError(msg) { console.error(`[ami-client] ERRO: ${msg}`); }
 
-// ── City detection ──
-const CITY_PATTERNS = [
-  { pattern: /caerleon/i, city: 'Caerleon' },
-  { pattern: /bridgewatch/i, city: 'Bridgewatch' },
-  { pattern: /lymhurst/i, city: 'Lymhurst' },
-  { pattern: /martlock/i, city: 'Martlock' },
-  { pattern: /fort.sterling/i, city: 'Fort Sterling' },
-  { pattern: /thetford/i, city: 'Thetford' },
-  { pattern: /black.market/i, city: 'Black Market' },
-];
-
 const SENTINELS = new Set([999999, 1000000, 9999999, 99999999, 2147483647, 0]);
 const MAX_PRICE = 50000000;
+const ITEM_ID_REGEX = /T[1-8]_[A-Z0-9_@]+/g;
 
 function isSentinel(v) {
   if (!v || v <= 0) return true;
@@ -31,45 +21,28 @@ function isSentinel(v) {
   return false;
 }
 
-// ── Raw packet parser ──
-// Albion item IDs match: T[1-8]_[A-Z0-9_]+ (e.g. T4_BAG, T8_2H_HOLYSTAFF)
-const ITEM_ID_REGEX = /T[1-8]_[A-Z0-9_@]+/g;
-
 function scanBuffer(buf, offset, length) {
   const results = [];
   const sub = buf.slice(offset, offset + length);
   const str = sub.toString('ascii');
 
-  // Find all item IDs in the packet
   let match;
   ITEM_ID_REGEX.lastIndex = 0;
   while ((match = ITEM_ID_REGEX.exec(str)) !== null) {
-    const itemId = match[0].replace(/@\d+$/, ''); // strip enchant suffix
+    const itemId = match[0].replace(/@\d+$/, '');
     const pos = match.index;
 
-    // Look for integer values (prices) within 60 bytes after the item ID
-    // Prices are typically 4-byte big-endian integers
     for (let i = pos + match[0].length; i < Math.min(pos + match[0].length + 60, length); i++) {
       if (i + 4 > length) break;
       const val = sub.readUInt32BE(i);
       if (!isSentinel(val) && val >= 100 && val <= MAX_PRICE) {
         results.push({ itemId, price: val });
-        break; // one price per item ID occurrence
+        break;
       }
     }
   }
 
   return results;
-}
-
-// ── City from packet ──
-function detectCityFromBuffer(buf, offset, length) {
-  const sub = buf.slice(offset, offset + length);
-  const str = sub.toString('utf8');
-  for (const { pattern, city } of CITY_PATTERNS) {
-    if (pattern.test(str)) return city;
-  }
-  return null;
 }
 
 // ── Batch sender ──
@@ -184,13 +157,6 @@ function main() {
 
       const udpPayloadOffset = ret.offset;
       const udpPayloadLength = ret.info.length;
-
-      // Detect city from packet
-      const city = detectCityFromBuffer(buffer, udpPayloadOffset, udpPayloadLength);
-      if (city && city !== sender.currentCity) {
-        sender.currentCity = city;
-        log(`Cidade detectada: ${city}`);
-      }
 
       // Scan for item IDs and prices
       const items = scanBuffer(buffer, udpPayloadOffset, udpPayloadLength);
