@@ -32,13 +32,19 @@ async function getCategories() {
 
 async function getLatestPrices(itemId, quality) {
   const q = quality ? `?quality=${quality}` : '';
-  return apiGet(`/api/prices/${itemId}/latest${q}`);
+  const res = await apiGet(`/api/prices/${itemId}/latest${q}`);
+  const arr = res.data || res;
+  arr.low_confidence = res.low_confidence || false;
+  return arr;
 }
 
 async function getPriceHistory(itemId, limit = 200, quality) {
   const params = new URLSearchParams({ limit });
   if (quality) params.set('quality', quality);
-  return apiGet(`/api/prices/${itemId}?${params}`);
+  const res = await apiGet(`/api/prices/${itemId}?${params}`);
+  const arr = res.data || res;
+  arr.low_confidence = res.low_confidence || false;
+  return arr;
 }
 
 async function fetchFromAodp(itemId) {

@@ -276,6 +276,7 @@ Router.register('/itens', async (app) => {
         getLatestPrices(itemId, 1),
         getPriceHistory(itemId, 500, 1),
       ]);
+      const lowConfidence = latest.low_confidence || history.low_confidence;
 
       let html = '';
 
@@ -315,6 +316,12 @@ Router.register('/itens', async (app) => {
         const maxSell = sells.length ? Math.max(...sells) : 0;
         const avgBuy = buys.length ? Math.round(buys.reduce((a, b) => a + b, 0) / buys.length) : 0;
 
+        const lowConfidenceHtml = lowConfidence
+          ? `<div style="font-size:0.7rem;color:var(--warning,#e67e22);margin-top:0.5rem;padding:0.4rem 0.6rem;background:rgba(230,126,34,0.08);border-radius:4px;border-left:3px solid var(--warning,#e67e22)">
+              &#9888; Poucos registros disponíveis (${history.length}) — dado pode não refletir o mercado real.
+            </div>`
+          : '';
+
         html += `<div class="card" style="margin-bottom:1rem">
           <div class="section-title">Estatísticas</div>
           <div class="grid-3">
@@ -325,6 +332,7 @@ Router.register('/itens', async (app) => {
             <div class="stat-box"><div class="value">${history.length}</div><div class="label">Registros</div></div>
             <div class="stat-box"><div class="value">${new Set(history.map(h => h.city)).size}</div><div class="label">Cidades</div></div>
           </div>
+          ${lowConfidenceHtml}
         </div>`;
 
         html += `<div class="card">

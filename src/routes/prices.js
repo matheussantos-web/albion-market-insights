@@ -50,6 +50,12 @@ router.get('/compare', (req, res) => {
 router.get('/:uniqueName', async (req, res) => {
   const db = getDb();
   const { city, limit = 50, source, quality } = req.query;
+  const itemName = req.params.uniqueName;
+
+  const countRow = db.prepare(
+    'SELECT COUNT(*) AS total FROM market_prices WHERE item_unique_name = ?'
+  ).get(itemName);
+  const lowConfidence = (countRow?.total || 0) < 3;
 
   function runQuery() {
     let query = `
@@ -65,7 +71,7 @@ router.get('/:uniqueName', async (req, res) => {
         AND mp.sell_price_min > 0
         AND mp.sell_price_min < 50000000
     `;
-    const params = [req.params.uniqueName];
+    const params = [itemName];
 
     if (city) {
       query += ' AND l.name = ?';
@@ -91,14 +97,14 @@ router.get('/:uniqueName', async (req, res) => {
   if (rows.length === 0) {
     const { fetchItemFromAodp } = require('../services/publicSync');
     try {
-      await fetchItemFromAodp(req.params.uniqueName);
+      await fetchItemFromAodp(itemName);
       rows = runQuery();
     } catch (err) {
-      console.error(`[prices] fallback AODP falhou para ${req.params.uniqueName}: ${err.message}`);
+      console.error(`[prices] fallback AODP falhou para ${itemName}: ${err.message}`);
     }
   }
 
-  res.json(rows);
+  res.json({ low_confidence: lowConfidence, data: rows });
 });
 
 // GET /api/prices/:uniqueName/latest — preço atual agrupado por cidade
@@ -106,26 +112,34 @@ router.get('/:uniqueName/latest', async (req, res) => {
   const quality = req.query.quality ? Number(req.query.quality) : null;
   const cacheKey = `${req.params.uniqueName}:latest${quality ? ':q' + quality : ''}`;
   const cached = cache.get(cacheKey);
-  if (cached && cached.length > 0) return res.json(cached);
+  if (cached && cached.data) return res.json(cached);
 
   const db = getDb();
+  const itemName = req.params.uniqueName;
+
+  const countRow = db.prepare(
+    'SELECT COUNT(*) AS total FROM market_prices WHERE item_unique_name = ?'
+  ).get(itemName);
+  const lowConfidence = (countRow?.total || 0) < 3;
+
   const sql = buildLatestQuery(quality);
-  let params = [req.params.uniqueName];
+  let params = [itemName];
   if (quality) params.push(quality);
   let rows = db.prepare(sql).all(...params);
 
   if (rows.length === 0) {
     const { fetchItemFromAodp } = require('../services/publicSync');
     try {
-      await fetchItemFromAodp(req.params.uniqueName);
+      await fetchItemFromAodp(itemName);
       rows = db.prepare(sql).all(...params);
     } catch (err) {
-      console.error(`[prices/latest] fallback AODP falhou para ${req.params.uniqueName}: ${err.message}`);
+      console.error(`[prices/latest] fallback AODP falhou para ${itemName}: ${err.message}`);
     }
   }
 
-  cache.set(cacheKey, rows);
-  res.json(rows);
+  const result = { low_confidence: lowConfidence, data: rows };
+  cache.set(cacheKey, result);
+  res.json(result);
 });
 
 module.exports = router;
