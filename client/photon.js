@@ -563,7 +563,7 @@ function decodeOperationResponse(stream) {
 let _debug = false;
 function dbg(...args) { if (_debug) console.log('[photon]', ...args); }
 
-const PHOTON_VERSION = '4.0.3-fragfix';
+const PHOTON_VERSION = '4.0.4-buyscale';
 
 // Always-on diagnostic
 let _diagSeen = 0;
@@ -731,8 +731,9 @@ function extractMarketOrders(stringArray, opCode, results) {
       // Strip enchantment suffix from item ID (e.g. "T4_BAG@3" -> "T4_BAG")
       const cleanItemId = itemId.replace(/@\d+$/, '');
 
-      // Game sends prices multiplied by 10000 — normalize
-      const normalizedPrice = Math.round(Number(price) / 10000);
+      // Game sends sell order prices ×10000 but buy order prices in silver format
+      const isBuy = auctionType === 'request';
+      const normalizedPrice = isBuy ? Math.round(Number(price)) : Math.round(Number(price) / 10000);
 
       results.push({
         itemId: cleanItemId,
@@ -789,8 +790,9 @@ function extractAuctionData(params, opCode, results) {
 
       if (itemId && typeof itemId === 'string' && price && !isSentinel(price)) {
         const loc = getCurrentLocation();
-        // Game sends prices multiplied by 10000 — normalize
-        const normalizedPrice = Math.round(Number(price) / 10000);
+        // Game sends sell order prices ×10000 but buy order prices in silver format
+        const isBuy = auctionType === 'request';
+        const normalizedPrice = isBuy ? Math.round(Number(price)) : Math.round(Number(price) / 10000);
         results.push({
           itemId: itemId.replace(/@\d+$/, ''),
           quality: typeof quality === 'number' ? quality : 1,
@@ -863,8 +865,9 @@ function extractRawFragmentData(data, results) {
 
         if (!seen.has(orderKey)) {
           seen.add(orderKey);
-          // Game sends prices multiplied by 10000 — normalize
-          const normalizedPrice = Math.round(Number(rawPrice) / 10000);
+          // Game sends sell order prices ×10000 but buy order prices in silver format
+          const isBuy = auctionType === 'request';
+          const normalizedPrice = isBuy ? Math.round(Number(rawPrice)) : Math.round(Number(rawPrice) / 10000);
           results.push({
             itemId: cleanId,
             quality,

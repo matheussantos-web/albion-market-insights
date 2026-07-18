@@ -58,7 +58,10 @@ router.post('/', (req, res) => {
         if (!location) { skippedLocation++; continue; }
       }
 
-      if (isSentinel(row.sellPriceMin)) { skippedSentinel++; continue; }
+      // Skip if BOTH sell and buy prices are missing/sentinel — at least one must be valid
+      const hasSell = row.sellPriceMin != null && !isSentinel(row.sellPriceMin);
+      const hasBuy = row.buyPriceMin != null && !isSentinel(row.buyPriceMin);
+      if (!hasSell && !hasBuy) { skippedSentinel++; continue; }
 
       if (looksUnderscaled(row.sellPriceMin) || looksUnderscaled(row.buyPriceMin)) {
         console.warn(`[ingest] PRICE_ANOMALY: item=${row.itemId} city=${row.city} sell=${row.sellPriceMin} buy=${row.buyPriceMin} auction=${row.auctionType}`);
@@ -68,10 +71,10 @@ router.post('/', (req, res) => {
         item_unique_name: row.itemId,
         location_id: location.id,
         quality: row.quality ?? 1,
-        sell_price_min: row.sellPriceMin ?? null,
-        sell_price_max: isSentinel(row.sellPriceMax) ? null : row.sellPriceMax ?? null,
-        buy_price_min: isSentinel(row.buyPriceMin) ? null : row.buyPriceMin ?? null,
-        buy_price_max: isSentinel(row.buyPriceMax) ? null : row.buyPriceMax ?? null,
+        sell_price_min: hasSell ? row.sellPriceMin : null,
+        sell_price_max: hasSell && !isSentinel(row.sellPriceMax) ? row.sellPriceMax : null,
+        buy_price_min: hasBuy ? row.buyPriceMin : null,
+        buy_price_max: hasBuy && !isSentinel(row.buyPriceMax) ? row.buyPriceMax : null,
         observed_at: row.timestamp,
         contributor_id: null,
       });

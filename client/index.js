@@ -9,7 +9,7 @@ const path = require('path');
 const { parsePhotonPacket, setDebug, getCurrentLocation, getDiag, PHOTON_VERSION } = require('./photon');
 
 const SERVER = 'http://191.252.219.229:3000';
-const CLIENT_VERSION = '4.0.6';
+const CLIENT_VERSION = '4.0.7';
 const LOG_FILE = path.join(__dirname, 'debug.log');
 const RAW_INGEST_LOG = path.join(__dirname, 'raw_ingest_debug.log');
 
