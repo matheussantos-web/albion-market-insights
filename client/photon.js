@@ -229,22 +229,30 @@ function getCurrentLocation() {
   return { id: _currentLocationId, name: _currentLocationName };
 }
 
+function normalizeZoneId(raw) {
+  if (raw === null || raw === undefined) return null;
+  let s = String(raw);
+  if (s.length === 0) return null;
+  // AODP: strip "-Auction2" suffix (Caerleon Market variant)
+  s = s.replace(/-Auction\d*$/, '');
+  // AODP: strip "BLACKBANK-" prefix (Smuggler's Den)
+  if (s.startsWith('BLACKBANK-')) s = s.substring(10);
+  // Try base ID for compound IDs like "1234-5"
+  const baseId = s.split('-')[0];
+  return baseId || s;
+}
+
 function setLocation(locationId) {
-  if (locationId === null || locationId === undefined) return;
-  let name;
-  if (typeof locationId === 'string') {
-    if (locationId.length === 0) return;
-    _currentLocationId = locationId;
-    name = ZONE_TO_CITY[locationId] || ZONE_TO_CITY[Number(locationId)];
-  } else {
-    _currentLocationId = String(locationId);
-    name = ZONE_TO_CITY[locationId] || ZONE_TO_CITY[String(locationId)];
-  }
+  const normalized = normalizeZoneId(locationId);
+  if (!normalized) return;
+  const numVal = Number(normalized);
+  const name = ZONE_TO_CITY[normalized] || (Number.isFinite(numVal) ? ZONE_TO_CITY[numVal] : undefined);
+  _currentLocationId = normalized;
   if (name) {
     _currentLocationName = name;
   } else {
-    _currentLocationName = `City(${locationId})`;
-    console.log(`[loc] UNKNOWN zone: ${locationId} (type=${typeof locationId})`);
+    _currentLocationName = `City(${normalized})`;
+    console.log(`[loc] UNKNOWN zone: ${normalized} (raw=${locationId})`);
   }
   console.log(`[loc] Zone → ${_currentLocationName} (${_currentLocationId})`);
 }
@@ -663,7 +671,10 @@ function decodeMessage(msgPayload) {
 // ── Location name mapping ──
 function getLocationName(id) {
   if (id === null || id === undefined) return _currentLocationName;
-  return ZONE_TO_CITY[id] || ZONE_TO_CITY[String(id)] || `City(${id})`;
+  const normalized = normalizeZoneId(id);
+  if (!normalized) return _currentLocationName;
+  const numVal = Number(normalized);
+  return ZONE_TO_CITY[normalized] || (Number.isFinite(numVal) ? ZONE_TO_CITY[numVal] : null) || `City(${normalized})`;
 }
 
 function handleMessage(msg, results) {
