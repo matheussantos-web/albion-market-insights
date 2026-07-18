@@ -22,6 +22,7 @@ router.post('/', (req, res) => {
   const db = getDb();
 
   const getLocationId = db.prepare('SELECT id FROM locations WHERE name = ?');
+  const getItemExists = db.prepare('SELECT 1 FROM items WHERE unique_name = ?');
   const insertPrice = db.prepare(`
     INSERT INTO market_prices
       (item_unique_name, location_id, quality, sell_price_min, sell_price_max,
@@ -38,6 +39,8 @@ router.post('/', (req, res) => {
       if (!location) continue;
 
       if (isSentinel(row.sellPriceMin)) { rejected++; continue; }
+
+      if (!getItemExists.get(row.itemId)) continue;
 
       insertPrice.run({
         item_unique_name: row.itemId,
