@@ -273,8 +273,8 @@ Router.register('/itens', async (app) => {
 
     try {
       const [latest, history] = await Promise.all([
-        getLatestPrices(itemId),
-        getPriceHistory(itemId, 500),
+        getLatestPrices(itemId, 1),
+        getPriceHistory(itemId, 500, 1),
       ]);
 
       let html = '';
