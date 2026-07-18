@@ -173,8 +173,10 @@ const TYPE = {
 // ── Albion operation/event codes (from AODP source) ──
 // Market auction operations — codes found in params[253]
 const AUCTION_OPS = new Set([81, 82, 83, 95, 174, 176, 250]);
-// Join response (location tracking)
+// Join response (location tracking) — params[8] = zone ID string
 const JOIN_OP = 2;
+// ChangeCluster response (zone change tracking) — params[0] = zone ID string
+const CHANGE_CLUSTER_OP = 41;
 // MarketPlaceNotification event code — found in params[252]
 const MARKET_EVENT = 183;
 
@@ -189,26 +191,38 @@ function isSentinel(v) {
 }
 
 // ── Location tracking ──
-const LOCATION_NAMES = {
-  3003: 'Brecilien',
-  3004: 'Caerleon',
-  3005: 'Bridgewatch',
-  3006: 'Fort Sterling',
-  3007: 'Lymhurst',
-  3008: 'Martlock',
-  3009: 'Thetford',
-  499:  'Black Market',
-  1:    'Blue City',
-  2:    'Green City',
-  3:    'Red City',
-  4:    'Yellow City',
-  1000: 'Forest Dungeon',
-  1100: 'Roads of Avalon',
-  2000: 'Mists',
-  2301: 'Mists Outpost',
+// Zone IDs from the game are STRINGS (e.g. "2000" for Bridgewatch, "3003" for Caerleon).
+// Source: zones.json from Albion-Online-OpenRadar project.
+// params[8] in Join response (opCode 2) contains the zone ID as a string.
+// Market order JSON LocationId uses the same values as numbers.
+const ZONE_TO_CITY = {
+  // Main city zones (string keys from params[8])
+  '0000': 'Thetford',
+  '1000': 'Lymhurst',
+  '2000': 'Bridgewatch',
+  '3003': 'Caerleon',
+  '3004': 'Martlock',
+  '4000': 'Fort Sterling',
+  '5000': 'Brecilien',
+  '499':  'Black Market',
+  // Portal / Mists entrance zones → map to parent city
+  '0301': 'Thetford',
+  '1301': 'Lymhurst',
+  '2301': 'Bridgewatch',
+  '3301': 'Martlock',
+  '4301': 'Fort Sterling',
+  // Same IDs as numbers (from market order LocationId JSON)
+  0:      'Thetford',
+  1000:   'Lymhurst',
+  2000:   'Bridgewatch',
+  3003:   'Caerleon',
+  3004:   'Martlock',
+  4000:   'Fort Sterling',
+  5000:   'Brecilien',
+  499:    'Black Market',
 };
 
-let _currentLocationId = 3004; // default Caerleon
+let _currentLocationId = '3003'; // default Caerleon (string zone ID)
 let _currentLocationName = 'Caerleon';
 
 function getCurrentLocation() {
@@ -216,10 +230,23 @@ function getCurrentLocation() {
 }
 
 function setLocation(locationId) {
-  if (typeof locationId !== 'number') locationId = Number(locationId);
-  if (!locationId || locationId <= 0) return;
-  _currentLocationId = locationId;
-  _currentLocationName = LOCATION_NAMES[locationId] || `City(${locationId})`;
+  if (locationId === null || locationId === undefined) return;
+  let name;
+  if (typeof locationId === 'string') {
+    if (locationId.length === 0) return;
+    _currentLocationId = locationId;
+    name = ZONE_TO_CITY[locationId] || ZONE_TO_CITY[Number(locationId)];
+  } else {
+    _currentLocationId = String(locationId);
+    name = ZONE_TO_CITY[locationId] || ZONE_TO_CITY[String(locationId)];
+  }
+  if (name) {
+    _currentLocationName = name;
+  } else {
+    _currentLocationName = `City(${locationId})`;
+    console.log(`[loc] UNKNOWN zone: ${locationId} (type=${typeof locationId})`);
+  }
+  console.log(`[loc] Zone → ${_currentLocationName} (${_currentLocationId})`);
 }
 
 /**
@@ -563,7 +590,7 @@ function decodeOperationResponse(stream) {
 let _debug = false;
 function dbg(...args) { if (_debug) console.log('[photon]', ...args); }
 
-const PHOTON_VERSION = '4.0.4-buyscale';
+const PHOTON_VERSION = '4.0.5-locationfix';
 
 // Always-on diagnostic
 let _diagSeen = 0;
@@ -635,7 +662,8 @@ function decodeMessage(msgPayload) {
 
 // ── Location name mapping ──
 function getLocationName(id) {
-  return LOCATION_NAMES[id] || `City(${id})`;
+  if (id === null || id === undefined) return _currentLocationName;
+  return ZONE_TO_CITY[id] || ZONE_TO_CITY[String(id)] || `City(${id})`;
 }
 
 function handleMessage(msg, results) {
@@ -663,11 +691,23 @@ function handleMessage(msg, results) {
     }
 
     // Location tracking: Join response opCode=2 has locationId in params[8]
+    // params[8] is a STRING zone ID (e.g. "2000" for Bridgewatch, "3003" for Caerleon)
     if (resp.opCode === JOIN_OP || albionOpCode === JOIN_OP) {
-      const locId = resp.params[8];
-      if (locId) {
-        setLocation(locId);
-        dbg(`    >>> JOIN: location=${_currentLocationName} (${_currentLocationId})`);
+      const p8 = resp.params[8];
+      if (p8 !== undefined && p8 !== null) {
+        console.log(`[loc] Join params[8]=${JSON.stringify(p8)} type=${typeof p8}`);
+        setLocation(p8);
+      } else {
+        console.log(`[loc] Join received but params[8] missing. Keys: [${Object.keys(resp.params).join(',')}]`);
+      }
+    }
+
+    // ChangeCluster: zone change response opCode=41 has new zone ID in params[0]
+    if (albionOpCode === CHANGE_CLUSTER_OP) {
+      const p0 = resp.params[0];
+      if (p0 !== undefined && p0 !== null) {
+        console.log(`[loc] ChangeCluster params[0]=${JSON.stringify(p0)} type=${typeof p0}`);
+        setLocation(p0);
       }
     }
 
@@ -1076,4 +1116,4 @@ function parsePhotonPacket(payload) {
 
 function setDebug(on) { _debug = on; }
 
-module.exports = { parsePhotonPacket, setDebug, isSentinel, SENTINELS_RAW, MAX_PRICE_RAW, getCurrentLocation, getLocationName, LOCATION_NAMES, getDiag, resetDiag, PHOTON_VERSION };
+module.exports = { parsePhotonPacket, setDebug, isSentinel, SENTINELS_RAW, MAX_PRICE_RAW, getCurrentLocation, getLocationName, ZONE_TO_CITY, getDiag, resetDiag, PHOTON_VERSION };
