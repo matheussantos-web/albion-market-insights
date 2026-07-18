@@ -1047,6 +1047,119 @@ a:hover { color: var(--text); }
   .news-grid { grid-template-columns: 1fr; }
 }
 
+/* ── Filter Label ── */
+.filter-label {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.3rem;
+  display: block;
+}
+
+/* ── Searchable Select ── */
+.searchable-select {
+  position: relative;
+}
+.ss-trigger {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.8rem;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ss-trigger:hover { border-color: var(--border-light); }
+.searchable-select.open .ss-trigger { border-color: var(--gold); }
+.ss-trigger.placeholder { color: var(--text-muted); }
+.ss-trigger:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.ss-dropdown {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 2px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  z-index: 200;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  overflow: hidden;
+}
+.ss-dropdown.active { display: block; }
+
+.ss-search {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  font-size: 0.75rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.ss-list {
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.ss-item {
+  padding: 0.45rem 0.75rem;
+  font-size: 0.78rem;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background 0.1s;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.ss-item:last-child { border-bottom: none; }
+.ss-item:hover { background: var(--surface3); }
+.ss-item.selected { color: var(--gold); background: var(--gold-glow); }
+.ss-item-meta { font-size: 0.6rem; color: var(--text-muted); }
+.ss-item.ss-empty { color: var(--text-muted); cursor: default; font-style: italic; }
+
+/* ── Pill Bar ── */
+.pill-bar {
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+  min-height: 34px;
+  align-items: center;
+}
+.pill-empty {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+.pill {
+  padding: 0.3rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface2);
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.pill:hover { border-color: var(--gold-dim); color: var(--text); }
+.pill.active {
+  background: var(--gold);
+  color: var(--bg);
+  border-color: var(--gold);
+}
+
 /* ── Flipper v2 ── */
 .flipper-page-header {
   display: flex;
