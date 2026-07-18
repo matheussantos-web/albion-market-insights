@@ -530,8 +530,8 @@ function handleMessage(msg, results) {
     const resp = msg.data;
     const paramKeys = Object.keys(resp.params);
     dbg(`    opResponse: code=${resp.opCode} returnCode=${resp.returnCode} params(${paramKeys.length})=[${paramKeys.join(',')}]`);
-    if (paramKeys.length > 0 && paramKeys.length <= 5) {
-      dbg(`    opResponse detail: ${JSON.stringify(resp.params).substring(0, 400)}`);
+    if (paramKeys.length > 0) {
+      dbg(`    opResponse detail: ${JSON.stringify(resp.params).substring(0, 500)}`);
     }
     if (AUCTION_OPS.has(resp.opCode)) {
       dbg(`    >>> AUCTION OP ${resp.opCode}! Extracting data...`);
@@ -540,9 +540,15 @@ function handleMessage(msg, results) {
   } else if (msg.type === 'event') {
     const evt = msg.data;
     const paramKeys = Object.keys(evt.params);
-    dbg(`    event: code=${evt.code} params(${paramKeys.length})=[${paramKeys.join(',')}]${msg.hasFlag ? ' [encrypted]' : ''}`);
-    if (paramKeys.length > 0 && evt.code !== 1 && evt.code !== 3) {
-      const preview = JSON.stringify(evt.params).substring(0, 400);
+    const albionCode = evt.params[252];
+    dbg(`    event: code=${evt.code} albion=${albionCode} n=${paramKeys.length} keys=[${paramKeys.join(',')}]`);
+    if (paramKeys.length > 0 && evt.code !== 3) {
+      const preview = JSON.stringify(evt.params, (k, v) => {
+        if (v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length > 8) {
+          return `{${Object.keys(v).length} keys}`;
+        }
+        return v;
+      }).substring(0, 600);
       dbg(`    event detail: ${preview}`);
     }
     if (evt.code === MARKET_EVENT) {
