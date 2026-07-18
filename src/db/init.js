@@ -36,6 +36,40 @@ function runMigrations(database) {
     database.exec('CREATE INDEX IF NOT EXISTS idx_contributors_user ON contributors(user_id)');
     console.log('[db] migration: user_id added to contributors');
   }
+
+  // Migration: remove FK on item_unique_name to accept any item ID from game
+  const fks = database.prepare("PRAGMA foreign_key_list(market_prices)").all();
+  const hasItemFk = fks.some(f => f.from_column === 'item_unique_name');
+  if (hasItemFk) {
+    console.log('[db] migration: removing FK on market_prices.item_unique_name...');
+    database.pragma('foreign_keys = OFF');
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS market_prices_new (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        item_unique_name TEXT NOT NULL,
+        location_id   INTEGER NOT NULL,
+        quality       INTEGER DEFAULT 1,
+        sell_price_min INTEGER,
+        sell_price_max INTEGER,
+        buy_price_min  INTEGER,
+        buy_price_max  INTEGER,
+        observed_at    TEXT NOT NULL,
+        ingested_at    TEXT DEFAULT (datetime('now')),
+        contributor_id TEXT,
+        source         TEXT NOT NULL DEFAULT 'private',
+        FOREIGN KEY (location_id) REFERENCES locations(id)
+      );
+      INSERT INTO market_prices_new SELECT * FROM market_prices;
+      DROP TABLE market_prices;
+      ALTER TABLE market_prices_new RENAME TO market_prices;
+    `);
+    database.exec('CREATE INDEX IF NOT EXISTS idx_prices_item ON market_prices(item_unique_name)');
+    database.exec('CREATE INDEX IF NOT EXISTS idx_prices_location ON market_prices(location_id)');
+    database.exec('CREATE INDEX IF NOT EXISTS idx_prices_observed ON market_prices(observed_at)');
+    database.exec('CREATE INDEX IF NOT EXISTS idx_prices_source ON market_prices(source)');
+    database.pragma('foreign_keys = ON');
+    console.log('[db] migration: FK removed, indexes recreated');
+  }
 }
 
 module.exports = { getDb, init };

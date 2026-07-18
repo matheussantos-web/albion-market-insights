@@ -34,7 +34,6 @@ CREATE TABLE IF NOT EXISTS market_prices (
   ingested_at    TEXT DEFAULT (datetime('now')),
   contributor_id TEXT,            -- NULL quando source = 'public_adp'
   source         TEXT NOT NULL DEFAULT 'private', -- 'private' | 'public_adp'
-  FOREIGN KEY (item_unique_name) REFERENCES items(unique_name),
   FOREIGN KEY (location_id) REFERENCES locations(id)
 );
 
