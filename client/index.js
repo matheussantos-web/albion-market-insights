@@ -11,6 +11,7 @@ const { parsePhotonPacket, setDebug, getCurrentLocation, getDiag, PHOTON_VERSION
 const SERVER = 'http://191.252.219.229:3000';
 const CLIENT_VERSION = '4.0.6';
 const LOG_FILE = path.join(__dirname, 'debug.log');
+const RAW_INGEST_LOG = path.join(__dirname, 'raw_ingest_debug.log');
 
 function logToConsole(msg) { process.stdout.write(msg + '\n'); }
 function logError(msg) { process.stderr.write(`ERRO: ${msg}\n`); }
@@ -30,7 +31,7 @@ class BatchSender {
 
   addItem(itemId, price, quality, city, auctionType) {
     const isBuy = auctionType === 'request';
-    this.buffer.push({
+    const item = {
       itemId,
       city: city || 'Caerleon',
       quality: quality || 1,
@@ -40,8 +41,16 @@ class BatchSender {
       buyPriceMax: isBuy ? price : null,
       auctionType: auctionType || 'offer',
       timestamp: new Date().toISOString(),
-    });
+    };
+    this.buffer.push(item);
     this.stats.received++;
+
+    // DIAGNOSTIC: log every item sent to server
+    try {
+      fs.appendFileSync(RAW_INGEST_LOG,
+        JSON.stringify({ t: item.timestamp, itemId, price, city, auctionType }) + '\n');
+    } catch(e) {}
+
     if (this.buffer.length >= this.maxBatchSize) this.flush();
   }
 
@@ -77,8 +86,9 @@ class BatchSender {
 
 // ── Main ──
 function main() {
-  // Clear old log
+  // Clear old logs
   try { fs.writeFileSync(LOG_FILE, ''); } catch(e) {}
+  try { fs.writeFileSync(RAW_INGEST_LOG, ''); } catch(e) {}
 
   const sender = new BatchSender();
 
