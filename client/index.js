@@ -9,7 +9,7 @@ const path = require('path');
 const { parsePhotonPacket, setDebug, getCurrentLocation, getDiag, PHOTON_VERSION } = require('./photon');
 
 const SERVER = 'http://191.252.219.229:3000';
-const CLIENT_VERSION = '4.0.2-logfile';
+const CLIENT_VERSION = '4.0.4-fragfix';
 const LOG_FILE = path.join(__dirname, 'debug.log');
 
 function logToConsole(msg) { process.stdout.write(msg + '\n'); }
@@ -62,7 +62,7 @@ class BatchSender {
       }
       this.stats.sent++;
       this.stats.items += batch.length;
-      log(`${batch.length} registros enviados (total: ${this.stats.items})`);
+      logToConsole(`${batch.length} registros enviados (total: ${this.stats.items})`);
     } catch (err) {
       logError(`Falha ao enviar: ${err.message}`);
       this.stats.errors++;
@@ -116,11 +116,11 @@ function main() {
       let ret = decoders.Ethernet(buffer);
       if (ret.info.type !== PROTOCOL.ETHERNET.IPV4) return;
 
-      const srcIp = ret.info.srcaddr;
-      const dstIp = ret.info.dstaddr;
-
       ret = decoders.IPV4(buffer, ret.offset);
       if (ret.info.protocol !== PROTOCOL.IP.UDP) return;
+
+      const srcIp = ret.info.srcaddr;
+      const dstIp = ret.info.dstaddr;
 
       ret = decoders.UDP(buffer, ret.offset);
       if (ret.info.srcport != 5056 && ret.info.dstport != 5056) return;
@@ -166,10 +166,12 @@ function main() {
         logToConsole('--- Stats ---');
         logToConsole(`Pacotes: ${pktCount} (parsed: ${parsedCount})`);
         logToConsole(`Dir: srv->cli=${portStats.src5056} cli->srv=${portStats.dst5056} both=${portStats.both}`);
-        logToConsole(`Cmds: ${JSON.stringify(d.cmdTypes||{})} (total=${d.cmdTotal||0} skip=${d.cmdSkipped||0})`);
-        logToConsole(`Msgs: ${JSON.stringify(d.msgTypes||{})} decoded=${d.seen||0}`);
-        logToConsole(`OpCodes: ${JSON.stringify(d.opCodes||{})}`);
-        logToConsole(`Events: ${JSON.stringify(d.evtCodes||{})}`);
+        logToConsole(`Cmds: total=${d.cmdTotal||0} skip=${d.cmdSkipped||0} types=${JSON.stringify(d.cmdTypes||{})}`);
+        logToConsole(`Msgs: decoded=${d.seen||0} opResp=${d.opRespCount||0} types=${JSON.stringify(d.msgTypes||{})}`);
+        logToConsole(`Photon opCodes: ${JSON.stringify(d.opCodes||{})}`);
+        logToConsole(`Albion opCodes: ${JSON.stringify(d.albionOpCodes||{})}`);
+        logToConsole(`Albion evtCodes: ${JSON.stringify(d.albionEvtCodes||{})}`);
+        logToConsole(`Frags: recv=${d.fragCount||0} reassembled=${d.fragReassembled||0} rawOrders=${d.rawFragOrders||0}`);
         logToConsole(`Erros: ${(d.errs||[]).slice(0,3).join('; ')||'nenhum'}`);
         logToConsole(`Itens: ${foundCount} found, ${s.items} sent`);
         logToConsole(`Cidade: ${loc.name} (${loc.id})`);

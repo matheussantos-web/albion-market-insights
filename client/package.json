@@ -1,6 +1,6 @@
 {
   "name": "albion-insights-client",
-  "version": "4.0.0",
+  "version": "4.0.4",
   "description": "Cliente que captura pacotes Albion Online e envia dados de mercado pro servidor (arquitetura AODP)",
   "main": "index.js",
   "bin": "index.js",

@@ -555,31 +555,41 @@ function decodeOperationResponse(stream) {
 let _debug = false;
 function dbg(...args) { if (_debug) console.log('[photon]', ...args); }
 
-const PHOTON_VERSION = '4.0.1-diag';
+const PHOTON_VERSION = '4.0.3-fragfix';
 
 // Always-on diagnostic
 let _diagSeen = 0;
 let _diagPktCount = 0;
 let _diagCmdTotal = 0;
 let _diagCmdSkipped = 0;
+let _diagOpRespCount = 0;
+let _diagFragCount = 0;
+let _diagFragReassembled = 0;
 const _diagCmdTypes = {};
 const _diagMsgTypes = {};
 const _diagOpCodes = {};
+const _diagAlbionOpCodes = {};
 const _diagEvtCodes = {};
+const _diagAlbionEvtCodes = {};
 const _diagErrs = [];
 function resetDiag() {
   _diagSeen = 0;
   _diagPktCount = 0;
   _diagCmdTotal = 0;
   _diagCmdSkipped = 0;
+  _diagOpRespCount = 0;
+  _diagFragCount = 0;
+  _diagFragReassembled = 0;
   Object.keys(_diagCmdTypes).forEach(k => delete _diagCmdTypes[k]);
   Object.keys(_diagMsgTypes).forEach(k => delete _diagMsgTypes[k]);
   Object.keys(_diagOpCodes).forEach(k => delete _diagOpCodes[k]);
+  Object.keys(_diagAlbionOpCodes).forEach(k => delete _diagAlbionOpCodes[k]);
   Object.keys(_diagEvtCodes).forEach(k => delete _diagEvtCodes[k]);
+  Object.keys(_diagAlbionEvtCodes).forEach(k => delete _diagAlbionEvtCodes[k]);
   _diagErrs.length = 0;
 }
 function getDiag() {
-  return { cmdTypes: { ..._diagCmdTypes }, cmdTotal: _diagCmdTotal, cmdSkipped: _diagCmdSkipped, msgTypes: { ..._diagMsgTypes }, opCodes: { ..._diagOpCodes }, evtCodes: { ..._diagEvtCodes }, errs: [..._diagErrs], seen: _diagSeen, pkts: _diagPktCount };
+  return { cmdTypes: { ..._diagCmdTypes }, cmdTotal: _diagCmdTotal, cmdSkipped: _diagCmdSkipped, msgTypes: { ..._diagMsgTypes }, opCodes: { ..._diagOpCodes }, albionOpCodes: { ..._diagAlbionOpCodes }, evtCodes: { ..._diagEvtCodes }, albionEvtCodes: { ..._diagAlbionEvtCodes }, errs: [..._diagErrs], seen: _diagSeen, pkts: _diagPktCount, opRespCount: _diagOpRespCount, fragCount: _diagFragCount, fragReassembled: _diagFragReassembled, rawFragOrders: _diagRawFragOrders };
 }
 
 // Fragment reassembly buffer
@@ -597,7 +607,7 @@ function decodeMessage(msgPayload) {
   const rawMsgType = msgPayload.readByte();
   const msgType = rawMsgType & 0x7F;
 
-  if (_diagSeen < 50) {
+  if (_diagSeen < 20) {
     console.log(`[hex] msg(rem=${msgPayload.remaining()}): ${msgHex} | rawType=${rawMsgType} masked=${msgType} pos=${msgStart}`);
   }
 
@@ -608,7 +618,7 @@ function decodeMessage(msgPayload) {
   } else if (msgType === 4) {
     return { type: 'event', data: decodeEvent(msgPayload) };
   }
-  if (_diagSeen < 50) {
+  if (_diagSeen < 20) {
     console.log(`[hex]   UNKNOWN msgType=${msgType} (raw=${rawMsgType}), skipping`);
   }
   dbg(`  unknown msgType=${msgType}, skipping`);
@@ -625,9 +635,24 @@ function handleMessage(msg, results) {
 
   if (msg.type === 'opResponse') {
     const resp = msg.data;
+    _diagOpRespCount++;
 
     // Extract the REAL Albion opCode from params[253]
     const albionOpCode = resp.params[253] !== undefined ? resp.params[253] : resp.opCode;
+    _diagAlbionOpCodes[albionOpCode] = (_diagAlbionOpCodes[albionOpCode] || 0) + 1;
+
+    // Always log first 30 opResponses for diagnosis
+    if (_diagOpRespCount <= 30) {
+      const paramKeys = Object.keys(resp.params);
+      const debugType = Array.isArray(resp.debugMsg) ? `arr[${resp.debugMsg.length}]` : typeof resp.debugMsg;
+      console.log(`[opResp#${_diagOpRespCount}] photon=${resp.opCode} albion=${albionOpCode} rc=${resp.returnCode} isMkt=${resp.isMarketData} debug=${debugType} params=[${paramKeys.join(',')}]`);
+      if (resp.isMarketData && Array.isArray(resp.debugMsg) && resp.debugMsg.length > 0) {
+        console.log(`[opResp#${_diagOpRespCount}]   debug[0]: ${String(resp.debugMsg[0]).substring(0, 300)}`);
+      }
+      if (typeof resp.debugMsg === 'string') {
+        console.log(`[opResp#${_diagOpRespCount}]   debugStr: ${resp.debugMsg.substring(0, 300)}`);
+      }
+    }
 
     // Location tracking: Join response opCode=2 has locationId in params[8]
     if (resp.opCode === JOIN_OP || albionOpCode === JOIN_OP) {
@@ -658,10 +683,11 @@ function handleMessage(msg, results) {
 
     // Extract the REAL Albion event code from params[252]
     const albionCode = evt.params[252] !== undefined ? evt.params[252] : evt.code;
+    _diagAlbionEvtCodes[albionCode] = (_diagAlbionEvtCodes[albionCode] || 0) + 1;
 
     dbg(`    event: header=${evt.code} albion=${albionCode} n=${Object.keys(evt.params).length}`);
 
-    if (albionCode === MARKET_EVENT) {
+    if (albionCode === MARKET_EVENT || AUCTION_OPS.has(albionCode)) {
       dbg(`    >>> MARKET EVENT ${albionCode}! params keys: [${Object.keys(evt.params).join(',')}]`);
       extractAuctionData(evt.params, albionCode, results);
     }
@@ -769,6 +795,77 @@ function extractAuctionData(params, opCode, results) {
   }
 }
 
+// ── Extract JSON market orders from raw (non-Photon) fragment data ──
+// Fragments from Albion contain raw JSON market order data, NOT Photon messages.
+// The data starts mid-JSON (e.g. "entLevel":0,"QualityLevel":1,...)
+// We scan for JSON objects by matching braces.
+
+let _diagRawFragOrders = 0;
+
+function extractRawFragmentData(data, results) {
+  const text = data.toString('utf8');
+  const loc = getCurrentLocation();
+  let count = 0;
+  let pos = 0;
+
+  while (pos < text.length) {
+    const start = text.indexOf('{', pos);
+    if (start === -1) break;
+
+    // Match braces, respecting strings and escapes
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    let end = -1;
+
+    for (let i = start; i < text.length; i++) {
+      const c = text[i];
+      if (escape) { escape = false; continue; }
+      if (c === '\\' && inString) { escape = true; continue; }
+      if (c === '"') { inString = !inString; continue; }
+      if (inString) continue;
+      if (c === '{') depth++;
+      else if (c === '}') {
+        depth--;
+        if (depth === 0) { end = i; break; }
+      }
+    }
+
+    if (end === -1) break;
+    if (end - start < 20) { pos = end + 1; continue; } // too small to be a market order
+
+    const jsonStr = text.substring(start, end + 1);
+    try {
+      const obj = JSON.parse(jsonStr);
+
+      const itemId = obj.ItemTypeId || obj.itemTypeId;
+      const price = obj.UnitPriceSilver || obj.unitPrice || obj.price;
+
+      if (itemId && price && !isSentinel(price)) {
+        results.push({
+          itemId: (itemId || '').replace(/@\d+$/, ''),
+          quality: obj.QualityLevel || obj.quality || 1,
+          price: Number(price),
+          amount: obj.Amount || obj.amount || 1,
+          auctionType: obj.AuctionType || obj.auctionType || 'offer',
+          locationId: obj.LocationId || loc.id,
+          locationName: getLocationName(obj.LocationId || loc.id),
+          enchant: obj.EnchantmentLevel || 0,
+          source: 'frag_raw',
+        });
+        count++;
+      }
+    } catch (e) { }
+
+    pos = end + 1;
+  }
+
+  if (count > 0) {
+    _diagRawFragOrders += count;
+    console.log(`[diag] FRAG RAW: ${count} orders extracted (${data.length}B) total=${_diagRawFragOrders}`);
+  }
+}
+
 /**
  * Parse raw UDP payload and extract auction data.
  */
@@ -827,40 +924,31 @@ function parsePhotonPacket(payload) {
 
     if (cmdType === 4) break;
 
-    if (cmdType === 6 || cmdType === 7) {
-      if (cmdType === 7) {
-        stream.skip(4); // unreliable header
+    // Extract message from command body (types 6=Reliable, 7=Unreliable, 11=UnreliableFragment/etc)
+    if (cmdType === 6 || cmdType === 7 || cmdType === 11) {
+      let extraHeader = 0;
+      if (cmdType === 7) extraHeader = 4; // unreliable header
+      if (cmdType === 11) extraHeader = 4; // unreliable fragment also has 4-byte header
+
+      if (bodyLength <= extraHeader) {
+        _diagCmdSkipped++;
+        stream.skip(bodyLength);
+        continue;
       }
 
+      stream.skip(extraHeader);
       const msgPayload = new PhotonStream(payload, stream.pos);
-      stream.skip(bodyLength - (cmdType === 7 ? 4 : 0));
+      stream.skip(bodyLength - extraHeader);
 
       try {
         const msg = decodeMessage(msgPayload);
         if (msg) {
           _diagMsgTypes[msg.type] = (_diagMsgTypes[msg.type] || 0) + 1;
-          if (msg.type === 'opResponse') {
-            _diagOpCodes[msg.data.opCode] = (_diagOpCodes[msg.data.opCode] || 0) + 1;
-            if (_diagSeen < 50) {
-              console.log(`[diag] opResp opCode=${msg.data.opCode} rc=${msg.data.returnCode} isMkt=${msg.data.isMarketData} debugType=${typeof msg.data.debugMsg} paramsKeys=[${Object.keys(msg.data.params).join(',')}] debugLen=${Array.isArray(msg.data.debugMsg) ? msg.data.debugMsg.length : 'N/A'}`);
-              if (msg.data.debugMsg && typeof msg.data.debugMsg === 'string') {
-                console.log(`[diag]   debugStr: ${msg.data.debugMsg.substring(0, 200)}`);
-              }
-              if (Array.isArray(msg.data.debugMsg) && msg.data.debugMsg.length > 0) {
-                console.log(`[diag]   debugArr[0]: ${String(msg.data.debugMsg[0]).substring(0, 200)}`);
-              }
-            }
-          } else if (msg.type === 'event') {
-            _diagEvtCodes[msg.data.code] = (_diagEvtCodes[msg.data.code] || 0) + 1;
-            const a252 = msg.data.params[252];
-            if (_diagSeen < 50) {
-              console.log(`[diag] event code=${msg.data.code} a252=${a252} paramsKeys=[${Object.keys(msg.data.params).join(',')}]`);
-            }
-          }
+          _diagOpCodes[msg.data.opCode] = (_diagOpCodes[msg.data.opCode] || 0) + 1;
           _diagSeen++;
         } else {
           _diagMsgTypes['null'] = (_diagMsgTypes['null'] || 0) + 1;
-          if (_diagPktCount <= 10) console.log(`[hex]   msg returned null (unknown msgType)`);
+          if (_diagPktCount <= 5) console.log(`[hex]   msg returned null (unknown msgType)`);
         }
         handleMessage(msg, results);
       } catch (e) {
@@ -870,11 +958,12 @@ function parsePhotonPacket(payload) {
       continue;
     }
 
-    if (cmdType === 8) {
+    if (cmdType === 8 || cmdType === 9) {
+      _diagFragCount++;
       if (bodyLength < 20) {
         _diagCmdSkipped++;
         stream.skip(bodyLength);
-        if (_diagPktCount <= 10) console.log(`[hex]   FRAG too small: bodyLength=${bodyLength}`);
+        if (_diagFragCount <= 30) console.log(`[hex] FRAG#${_diagFragCount} too small: bodyLength=${bodyLength}`);
         continue;
       }
 
@@ -886,8 +975,8 @@ function parsePhotonPacket(payload) {
       const fragPayloadLen = bodyLength - 20;
       const fragPayload = stream.readBytes(fragPayloadLen);
 
-      if (_diagPktCount <= 20 || _diagSeen < 50) {
-        console.log(`[hex] FRAG startSeq=${startSeq} fragCount=${fragCount} fragNum=${fragNum} totalLen=${totalLen} opLen=${opLen} fragPayloadLen=${fragPayloadLen}`);
+      if (_diagFragCount <= 30) {
+        console.log(`[hex] FRAG#${_diagFragCount} type=${cmdType} startSeq=${startSeq} fragCount=${fragCount} fragNum=${fragNum}/${totalLen} opLen=${opLen} payloadLen=${fragPayloadLen}`);
       }
 
       let entry = _fragBufs.get(startSeq);
@@ -896,6 +985,10 @@ function parsePhotonPacket(payload) {
         _fragBufs.set(startSeq, entry);
       }
       entry.chunks.set(fragNum, fragPayload);
+
+      if (_diagFragCount <= 30) {
+        console.log(`[hex]   fragBuf startSeq=${startSeq} collected=${entry.chunks.size}/${entry.totalFragments} pending=${_fragBufs.size}`);
+      }
 
       if (entry.chunks.size === entry.totalFragments) {
         const chunks = [];
@@ -907,33 +1000,29 @@ function parsePhotonPacket(payload) {
         _fragBufs.delete(startSeq);
 
         if (chunks.length === entry.totalFragments) {
+          _diagFragReassembled++;
           const reassembled = Buffer.concat(chunks);
-          if (_diagSeen < 50) {
-            const rhex = Array.from(reassembled.slice(0, 30)).map(b => b.toString(16).padStart(2, '0')).join(' ');
-            console.log(`[hex] FRAG REASSEMBLED ${reassembled.length}B: ${rhex}`);
-          }
+          const rhex = Array.from(reassembled.slice(0, 40)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+          console.log(`[hex] FRAG OK #${_diagFragReassembled}: ${reassembled.length}B startSeq=${startSeq}: ${rhex}`);
           try {
             const msgPayload = new PhotonStream(reassembled);
             const msg = decodeMessage(msgPayload);
             if (msg) {
               _diagMsgTypes[msg.type + '_frag'] = (_diagMsgTypes[msg.type + '_frag'] || 0) + 1;
-              if (msg.type === 'opResponse') {
-                _diagOpCodes[msg.data.opCode] = (_diagOpCodes[msg.data.opCode] || 0) + 1;
-                if (_diagSeen < 50) {
-                  console.log(`[diag] FRAG opResp opCode=${msg.data.opCode} rc=${msg.data.returnCode} isMkt=${msg.data.isMarketData} paramsKeys=[${Object.keys(msg.data.params).join(',')}]`);
-                }
-              } else if (msg.type === 'event') {
-                _diagEvtCodes[msg.data.code] = (_diagEvtCodes[msg.data.code] || 0) + 1;
-                if (_diagSeen < 50) {
-                  console.log(`[diag] FRAG event code=${msg.data.code} paramsKeys=[${Object.keys(msg.data.params).join(',')}]`);
-                }
-              }
+              _diagOpCodes[msg.data.opCode] = (_diagOpCodes[msg.data.opCode] || 0) + 1;
               _diagSeen++;
+              console.log(`[diag] FRAG msg type=${msg.type} opCode=${msg.data.opCode} isMkt=${msg.data.isMarketData || false}`);
+              handleMessage(msg, results);
+            } else {
+              // Not a Photon message — extract raw JSON market orders
+              _diagMsgTypes['raw_frag'] = (_diagMsgTypes['raw_frag'] || 0) + 1;
+              extractRawFragmentData(reassembled, results);
             }
-            handleMessage(msg, results);
           } catch (e) {
             _diagErrs.push(e.message);
-            if (_diagErrs.length <= 10) console.log(`[diag] reassembled decode error: ${e.message}`);
+            console.log(`[diag] FRAG decode error: ${e.message}`);
+            // Even on error, try to extract JSON
+            extractRawFragmentData(reassembled, results);
           }
         }
       }
