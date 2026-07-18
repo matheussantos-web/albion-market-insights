@@ -20,7 +20,8 @@
   },
   "pkg": {
     "assets": [
-      "node_modules/cap/build/**/*"
+      "node_modules/cap/build/**/*",
+      "capture.js"
     ],
     "targets": [
       "node18-win-x64"
