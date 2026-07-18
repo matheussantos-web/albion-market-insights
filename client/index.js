@@ -191,6 +191,11 @@ class BatchSender {
 function main() {
   const sender = new BatchSender();
 
+  // Prevent crashes from unhandled protocol errors in ao-network
+  process.on('uncaughtException', (err) => {
+    logError(`Pacote ignorado: ${err.message}`);
+  });
+
   log('---');
   log('Albion Market Insights - Cliente v2.0');
   log('---');
@@ -215,45 +220,51 @@ function main() {
   }
 
   aoNet.events.use((result) => {
-    const ctx = result.context;
-    if (!ctx || !ctx.parameters) return;
+    try {
+      const ctx = result.context;
+      if (!ctx || !ctx.parameters) return;
 
-    const city = detectCity(ctx.parameters);
-    if (city && city !== sender.currentCity) {
-      sender.currentCity = city;
-      log(`Cidade detectada: ${city}`);
-    }
+      const city = detectCity(ctx.parameters);
+      if (city && city !== sender.currentCity) {
+        sender.currentCity = city;
+        log(`Cidade detectada: ${city}`);
+      }
+    } catch (e) {}
   });
 
   aoNet.events.on(aoNet.AODecoder.messageType.OperationResponse, (context) => {
-    if (!context || !context.parameters) return;
+    try {
+      if (!context || !context.parameters) return;
 
-    const opCode = context.parameters['253'];
-    if (opCode === undefined) return;
+      const opCode = context.parameters['253'];
+      if (opCode === undefined) return;
 
-    const isAuction = Object.values(AUCTION_OPS).includes(opCode);
-    if (!isAuction) return;
+      const isAuction = Object.values(AUCTION_OPS).includes(opCode);
+      if (!isAuction) return;
 
-    const items = extractMarketData(opCode, context.parameters);
-    if (items.length > 0) {
-      sender.addItems(items);
-      log(`Mercado: ${items.length} itens capturados (op: ${opCode})`);
-    }
+      const items = extractMarketData(opCode, context.parameters);
+      if (items.length > 0) {
+        sender.addItems(items);
+        log(`Mercado: ${items.length} itens capturados (op: ${opCode})`);
+      }
+    } catch (e) {}
   });
 
   aoNet.events.on(aoNet.AODecoder.messageType.Event, (context) => {
-    if (!context || !context.parameters) return;
+    try {
+      if (!context || !context.parameters) return;
 
-    const eventCode = context.parameters['252'];
-    if (eventCode === undefined) return;
+      const eventCode = context.parameters['252'];
+      if (eventCode === undefined) return;
 
-    if (eventCode === 181) {
-      const items = extractMarketData(eventCode, context.parameters);
-      if (items.length > 0) {
-        sender.addItems(items);
-        log(`Evento mercado: ${items.length} itens capturados`);
+      if (eventCode === 181) {
+        const items = extractMarketData(eventCode, context.parameters);
+        if (items.length > 0) {
+          sender.addItems(items);
+          log(`Evento mercado: ${items.length} itens capturados`);
+        }
       }
-    }
+    } catch (e) {}
   });
 
   setInterval(() => {
