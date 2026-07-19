@@ -6,12 +6,11 @@ const network = require('network');
 const fetch = require('node-fetch');
 const fs = require('fs');
 const path = require('path');
-const { parsePhotonPacket, setDebug, getCurrentLocation, getDiag, PHOTON_VERSION } = require('./photon');
+const { parsePhotonPacket, setDebug, getCurrentLocation, isZoneConfirmed, forceConfirmZone, getDiag, PHOTON_VERSION } = require('./photon');
 
 const SERVER = 'http://191.252.219.229:3000';
-const CLIENT_VERSION = '4.0.8';
+const CLIENT_VERSION = '4.0.9';
 const LOG_FILE = path.join(__dirname, 'debug.log');
-const RAW_INGEST_LOG = path.join(__dirname, 'raw_ingest_debug.log');
 
 function logToConsole(msg) { process.stdout.write(msg + '\n'); }
 function logError(msg) { process.stderr.write(`ERRO: ${msg}\n`); }
@@ -25,7 +24,7 @@ class BatchSender {
     this.buffer = [];
     this.batchInterval = 5000;
     this.maxBatchSize = 100;
-    this.stats = { received: 0, sent: 0, errors: 0, items: 0 };
+    this.stats = { received: 0, sent: 0, errors: 0, items: 0, blocked: 0 };
     setInterval(() => this.flush(), this.batchInterval);
   }
 
@@ -33,7 +32,7 @@ class BatchSender {
     const isBuy = auctionType === 'request';
     const item = {
       itemId,
-      city: city || 'Caerleon',
+      city: city || getCurrentLocation().name,
       quality: quality || 1,
       sellPriceMin: isBuy ? null : price,
       sellPriceMax: isBuy ? null : price,
@@ -42,14 +41,21 @@ class BatchSender {
       auctionType: auctionType || 'offer',
       timestamp: new Date().toISOString(),
     };
+
+    if (!isZoneConfirmed()) {
+      this.stats.blocked++;
+      if (this.stats.blocked <= 5) {
+        logToConsole(`[!] Dado retido: aguardando confirmação de cidade (zona) antes de enviar... (${this.stats.blocked} retidos)`);
+      }
+      return;
+    }
+
     this.buffer.push(item);
     this.stats.received++;
 
-    // DIAGNOSTIC: log every item sent to server
-    try {
-      fs.appendFileSync(RAW_INGEST_LOG,
-        JSON.stringify({ t: item.timestamp, itemId, price, city, auctionType }) + '\n');
-    } catch(e) {}
+    if (this.stats.blocked > 0 && this.stats.received === 1) {
+      logToConsole(`[✓] Cidade confirmada: ${getCurrentLocation().name} — ${this.stats.blocked} registros anteriores descartados`);
+    }
 
     if (this.buffer.length >= this.maxBatchSize) this.flush();
   }
@@ -88,7 +94,6 @@ class BatchSender {
 function main() {
   // Clear old logs
   try { fs.writeFileSync(LOG_FILE, ''); } catch(e) {}
-  try { fs.writeFileSync(RAW_INGEST_LOG, ''); } catch(e) {}
 
   const sender = new BatchSender();
 
@@ -96,6 +101,18 @@ function main() {
   logToConsole('Capturando pacotes UDP 5056...');
   logToConsole('Abra o Albion e va ao mercado. Ctrl+C para sair.');
   logToConsole('');
+  logToConsole('[loc] Aguardando confirmação de cidade (Join ou ChangeCluster)...');
+  logToConsole('[loc] Dados serão retidos até a cidade ser confirmada.');
+
+  // Safety timer: if no zone confirmation after 60s, auto-confirm with warning
+  const ZONE_CONFIRM_TIMEOUT = 60000;
+  const zoneTimer = setTimeout(() => {
+    if (!isZoneConfirmed()) {
+      console.log('[loc] ⚠ TIMEOUT: Nenhum Join/ChangeCluster recebido em 60s. Liberando dados com localização padrão (possivelmente incorreta).');
+      logToConsole('[loc] ⚠ AVISO: Cidade não confirmada após 60s. Dados liberados com localização padrão.');
+      forceConfirmZone();
+    }
+  }, ZONE_CONFIRM_TIMEOUT);
 
   const cap = new Cap();
   const buffer = Buffer.alloc(65535);
@@ -185,8 +202,8 @@ function main() {
         logToConsole(`Albion evtCodes: ${JSON.stringify(d.albionEvtCodes||{})}`);
         logToConsole(`Frags: recv=${d.fragCount||0} reassembled=${d.fragReassembled||0} rawOrders=${d.rawFragOrders||0}`);
         logToConsole(`Erros: ${(d.errs||[]).slice(0,3).join('; ')||'nenhum'}`);
-        logToConsole(`Itens: ${foundCount} found, ${s.items} sent`);
-        logToConsole(`Cidade: ${loc.name} (${loc.id})`);
+        logToConsole(`Itens: ${foundCount} found, ${s.items} sent, ${s.blocked} blocked`);
+        logToConsole(`Cidade: ${loc.name} (${loc.id}) | Confirmada: ${isZoneConfirmed() ? 'SIM' : 'NÃO'}`);
         logToConsole(`Log: ${LOG_FILE}`);
         logToConsole('---');
       }
@@ -194,12 +211,16 @@ function main() {
   });
 
   process.on('SIGINT', () => {
+    clearTimeout(zoneTimer);
     const d = getDiag();
     logToConsole(`Final: ${JSON.stringify(d)}`);
     logFile(`Final: ${JSON.stringify(d)}`);
     sender.flush().then(() => process.exit(0));
   });
-  process.on('SIGTERM', () => { sender.flush().then(() => process.exit(0)); });
+  process.on('SIGTERM', () => {
+    clearTimeout(zoneTimer);
+    sender.flush().then(() => process.exit(0));
+  });
 }
 
 main();

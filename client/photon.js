@@ -222,8 +222,18 @@ const ZONE_TO_CITY = {
   499:    'Black Market',
 };
 
-let _currentLocationId = '3003'; // default Caerleon (string zone ID)
+let _currentLocationId = '3003'; // default Caerleon (string zone ID) — overridden by Join/ChangeCluster
 let _currentLocationName = 'Caerleon';
+let _zoneConfirmed = false; // true only after Join or ChangeCluster response received
+
+function isZoneConfirmed() { return _zoneConfirmed; }
+
+function forceConfirmZone() {
+  if (!_zoneConfirmed) {
+    _zoneConfirmed = true;
+    console.log(`[loc] ⚠ Zone force-confirmed (timeout) → ${_currentLocationName} (${_currentLocationId})`);
+  }
+}
 
 function getCurrentLocation() {
   return { id: _currentLocationId, name: _currentLocationName };
@@ -247,6 +257,7 @@ function setLocation(locationId) {
   if (!normalized) return;
   const numVal = Number(normalized);
   const name = ZONE_TO_CITY[normalized] || (Number.isFinite(numVal) ? ZONE_TO_CITY[numVal] : undefined);
+  const prevName = _currentLocationName;
   _currentLocationId = normalized;
   if (name) {
     _currentLocationName = name;
@@ -254,7 +265,12 @@ function setLocation(locationId) {
     _currentLocationName = `City(${normalized})`;
     console.log(`[loc] UNKNOWN zone: ${normalized} (raw=${locationId})`);
   }
-  console.log(`[loc] Zone → ${_currentLocationName} (${_currentLocationId})`);
+  if (!_zoneConfirmed) {
+    _zoneConfirmed = true;
+    console.log(`[loc] ✓ ZONE CONFIRMED → ${_currentLocationName} (${_currentLocationId}) — dados liberados para envio`);
+  } else {
+    console.log(`[loc] Zone → ${_currentLocationName} (${_currentLocationId})`);
+  }
 }
 
 /**
@@ -598,7 +614,7 @@ function decodeOperationResponse(stream) {
 let _debug = false;
 function dbg(...args) { if (_debug) console.log('[photon]', ...args); }
 
-const PHOTON_VERSION = '4.0.5-locationfix';
+const PHOTON_VERSION = '4.0.6-zonegate';
 
 // Always-on diagnostic
 let _diagSeen = 0;
@@ -1127,4 +1143,4 @@ function parsePhotonPacket(payload) {
 
 function setDebug(on) { _debug = on; }
 
-module.exports = { parsePhotonPacket, setDebug, isSentinel, SENTINELS_RAW, MAX_PRICE_RAW, getCurrentLocation, getLocationName, ZONE_TO_CITY, getDiag, resetDiag, PHOTON_VERSION };
+module.exports = { parsePhotonPacket, setDebug, isSentinel, SENTINELS_RAW, MAX_PRICE_RAW, getCurrentLocation, getLocationName, isZoneConfirmed, forceConfirmZone, ZONE_TO_CITY, getDiag, resetDiag, PHOTON_VERSION };
