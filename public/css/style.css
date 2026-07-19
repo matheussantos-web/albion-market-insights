@@ -1042,6 +1042,16 @@ a:hover { color: var(--text); }
   .flipper-filter-row { flex-direction: column; gap: 0.6rem; }
   .flipper-layout-split { grid-template-columns: 1fr; }
   .flipper-activity-panel { display: none; }
+  .item-hero { flex-direction: column; align-items: center; text-align: center; }
+  .item-hero-metrics { justify-content: center; }
+  .item-hero-row { justify-content: center; }
+  .item-hero-warning { position: static; margin-top: 0.5rem; text-align: left; }
+  .route-flow { flex-direction: column; align-items: stretch; }
+  .route-arrow { justify-content: center; transform: rotate(90deg); padding: 0.3rem 0; }
+  .route-city { min-width: 0; }
+  .item-chart-stats { grid-template-columns: repeat(2, 1fr); }
+  .craft-tree-branches { flex-direction: column; align-items: center; }
+  .craft-tree-connector { width: 12px; height: 2px; }
 }
 @media (max-width: 500px) {
   .news-grid { grid-template-columns: 1fr; }
@@ -1158,6 +1168,402 @@ a:hover { color: var(--text); }
   background: var(--gold);
   color: var(--bg);
   border-color: var(--gold);
+}
+
+/* ── Item Detail: Hero ── */
+.item-hero {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+  position: relative;
+  overflow: hidden;
+}
+.item-hero::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+}
+.item-hero-icon-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.item-hero-glow {
+  position: absolute;
+  top: -16px; left: -16px;
+  width: calc(100% + 32px);
+  height: calc(100% + 32px);
+  border-radius: 50%;
+  filter: blur(20px);
+  pointer-events: none;
+}
+.item-hero-icon {
+  width: 88px;
+  height: 88px;
+  border-radius: 10px;
+  border: 2px solid var(--gold-dim);
+  position: relative;
+  z-index: 1;
+  background: var(--bg);
+}
+.item-hero-info { flex: 1; min-width: 0; }
+.item-hero-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.2rem;
+}
+.item-hero-name {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--text);
+  margin: 0;
+  line-height: 1.2;
+}
+.item-hero-tier {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  color: white;
+}
+.item-hero-enchant { background: var(--purple); }
+.item-hero-cat {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  background: var(--surface3);
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 600;
+}
+.item-hero-id {
+  font-family: monospace;
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  margin-bottom: 0.6rem;
+}
+.item-hero-metrics {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.4rem;
+}
+.item-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+.item-metric-label {
+  font-size: 0.55rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+.item-metric-value {
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: monospace;
+}
+.item-metric-city {
+  font-size: 0.55rem;
+  color: var(--text-dim);
+}
+.item-metric-sep {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  padding-bottom: 0.2rem;
+}
+.item-hero-updated {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+.item-hero-warning {
+  position: absolute;
+  top: 0.8rem; right: 0.8rem;
+  font-size: 0.65rem;
+  color: #e67e22;
+  background: rgba(230,126,34,0.1);
+  border: 1px solid rgba(230,126,34,0.2);
+  border-radius: 6px;
+  padding: 0.3rem 0.6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.price-gold { color: var(--gold); }
+.price-green { color: var(--green); }
+.price-red { color: var(--red); }
+.price-purple { color: var(--purple); }
+.price-dim { color: var(--text-dim); }
+
+/* ── Item Detail: Route ── */
+.route-flow {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  overflow-x: auto;
+  padding: 0.5rem 0;
+}
+.route-city {
+  flex: 1;
+  min-width: 110px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.7rem 0.8rem;
+  text-align: center;
+  transition: border-color 0.2s, background 0.2s;
+}
+.route-city:hover { border-color: var(--border-light); }
+.route-city--buy {
+  border-color: rgba(74,222,128,0.3);
+  background: rgba(74,222,128,0.04);
+}
+.route-city--sell {
+  border-color: rgba(201,169,78,0.3);
+  background: rgba(201,169,78,0.04);
+}
+.route-city-name {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 0.3rem;
+}
+.route-city-sell {
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-family: monospace;
+}
+.route-city-buy {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  font-family: monospace;
+}
+.route-city-source {
+  margin-top: 0.3rem;
+}
+.route-arrow {
+  display: flex;
+  align-items: center;
+  padding: 0 0.4rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+/* ── Item Detail: Chart Zone ── */
+.item-chart-zone { position: relative; }
+.item-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.6rem;
+}
+.item-chart-canvas-wrap { height: 260px; }
+.item-chart-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.6rem;
+  margin-top: 0.8rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--border);
+}
+.item-chart-stat {
+  text-align: center;
+}
+.item-chart-stat-label {
+  display: block;
+  font-size: 0.55rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.1rem;
+}
+.item-chart-stat-value {
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: monospace;
+}
+
+/* ── Item Detail: Opportunity Badges (overlay on chart) ── */
+.item-chart-opp-overlay {
+  position: absolute;
+  top: 0.8rem;
+  right: 0.8rem;
+  z-index: 5;
+}
+.item-chart-opp-overlay--below {
+  position: relative;
+  top: auto; right: auto;
+  margin-top: 0.5rem;
+}
+.opp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  backdrop-filter: blur(8px);
+}
+.opp-badge--flip {
+  background: rgba(74,222,128,0.12);
+  border: 1px solid rgba(74,222,128,0.25);
+}
+.opp-badge--craft {
+  background: rgba(96,165,250,0.12);
+  border: 1px solid rgba(96,165,250,0.25);
+}
+.opp-badge-icon { font-size: 0.85rem; }
+.opp-badge-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+}
+.opp-badge-profit {
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-family: monospace;
+}
+.opp-badge-profit small { font-size: 0.65rem; }
+.opp-badge-route {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+}
+.opp-badge-link {
+  font-size: 0.65rem;
+}
+
+/* ── Item Detail: Craft Tree ── */
+.craft-tree {
+  padding: 0;
+}
+.craft-tree-root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem 0;
+}
+.craft-tree-stem {
+  width: 2px;
+  height: 20px;
+  background: var(--border);
+}
+.craft-tree-branches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: center;
+  width: 100%;
+}
+.craft-tree-branch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.craft-tree-connector {
+  width: 2px;
+  height: 12px;
+  background: var(--border);
+}
+.craft-tree-node {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.8rem;
+  min-width: 160px;
+  transition: border-color 0.2s;
+}
+.craft-tree-node:hover { border-color: var(--gold-dim); }
+.craft-tree-node--final {
+  border-color: var(--gold-dim);
+  background: var(--gold-glow);
+  padding: 0.7rem 1rem;
+}
+.craft-tree-node-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  background: var(--bg);
+}
+.craft-tree-node-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.craft-tree-node-name {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.craft-tree-node-sub {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+}
+.craft-tree-node-price {
+  margin-left: auto;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  font-family: monospace;
+  font-size: 0.8rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.craft-tree-city {
+  font-family: inherit;
+  font-size: 0.55rem;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+.craft-tree-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.7rem 0;
+  margin-top: 0.5rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.8rem;
+  color: var(--text);
+}
+.craft-tree-total {
+  font-size: 1rem;
+  font-family: monospace;
+  font-weight: 700;
+}
+.craft-tree-profit {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  padding: 0.4rem 0;
+}
+.craft-tree-profit span {
+  font-weight: 700;
+  font-family: monospace;
+}
+.craft-tree-link {
+  display: inline-block;
+  font-size: 0.7rem;
+  color: var(--gold);
+  margin-top: 0.4rem;
 }
 
 /* ── Flipper v2 ── */

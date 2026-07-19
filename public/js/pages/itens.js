@@ -260,6 +260,10 @@ Router.register('/itens', async (app) => {
     await loadVariantDetail(variant.unique_name, variant.name_ptbr || selected.base, selected.tier);
   }
 
+  function getItemIconUrl(uniqueName) {
+    return `https://render.albiononline.com/v1/item/${uniqueName}?quality=1&size=128`;
+  }
+
   async function loadVariantDetail(uniqueName, itemName, tier) {
     const panel = document.getElementById('itemResultPanel');
     panel.innerHTML = '<div class="loading">Carregando...</div>';
@@ -287,68 +291,136 @@ Router.register('/itens', async (app) => {
 
       let html = '';
 
-      html += `<div style="display:flex;align-items:baseline;gap:0.75rem;margin-bottom:0.8rem;flex-wrap:wrap">
-        <h2 style="font-size:1.1rem;font-weight:700">${itemName}</h2>
-        <span style="font-family:monospace;font-size:0.7rem;color:var(--text-dim)">${uniqueName}</span>
-        <span class="badge badge-gold" style="background:${TIER_COLORS[tier] || '#888'}">T${tier}</span>
-        ${selected.enchantment > 0 ? `<span class="badge badge-purple">@${selected.enchantment}</span>` : ''}
-        <span class="badge badge-surface">${selected.category}</span>
-      </div>`;
+      const iconUrl = getItemIconUrl(uniqueName);
+      const tierColor = TIER_COLORS[tier] || '#888';
+      const enchantLabel = selected.enchantment > 0 ? `@${selected.enchantment}` : '';
 
-      if (lowConfidence) {
-        html += `<div style="font-size:0.7rem;color:var(--warning,#e67e22);margin-bottom:1rem;padding:0.4rem 0.6rem;background:rgba(230,126,34,0.08);border-radius:4px;border-left:3px solid var(--warning,#e67e22)">
-          &#9888; Poucos registros disponíveis — dado pode não refletir o mercado real.
+      html += `
+        <div class="item-hero">
+          <div class="item-hero-icon-wrap">
+            <div class="item-hero-glow" style="background:radial-gradient(circle,${tierColor}33 0%,transparent 70%)"></div>
+            <img src="${iconUrl}" alt="${itemName}" class="item-hero-icon" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%231a1a26%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2255%22 text-anchor=%22middle%22 fill=%22%23888%22 font-size=%2214%22>?</text></svg>'" />
+          </div>
+          <div class="item-hero-info">
+            <div class="item-hero-row">
+              <h2 class="item-hero-name">${itemName}</h2>
+              <span class="item-hero-tier" style="background:${tierColor}">T${tier}</span>
+              ${enchantLabel ? `<span class="item-hero-tier item-hero-enchant">${enchantLabel}</span>` : ''}
+              <span class="item-hero-cat">${selected.category}</span>
+            </div>
+            <div class="item-hero-id">${uniqueName}</div>
+            <div class="item-hero-metrics">
+              <div class="item-metric">
+                <span class="item-metric-label">Menor</span>
+                <span class="item-metric-value price-gold">${menor ? fmtPrice(menor) : '—'}</span>
+                ${melhorCompraCidade ? `<span class="item-metric-city">${melhorCompraCidade}</span>` : ''}
+              </div>
+              <div class="item-metric-sep">→</div>
+              <div class="item-metric">
+                <span class="item-metric-label">Maior</span>
+                <span class="item-metric-value price-green">${maior ? fmtPrice(maior) : '—'}</span>
+                ${melhorVendaCidade ? `<span class="item-metric-city">${melhorVendaCidade}</span>` : ''}
+              </div>
+              <div class="item-metric-sep">·</div>
+              <div class="item-metric">
+                <span class="item-metric-label">Spread</span>
+                <span class="item-metric-value price-purple">${spread ? spread + '%' : '—'}</span>
+              </div>
+              <div class="item-metric-sep">·</div>
+              <div class="item-metric">
+                <span class="item-metric-label">Craftável</span>
+                <span class="item-metric-value ${recipe.has_recipe ? 'price-green' : 'price-dim'}">${recipe.has_recipe ? 'Sim' : 'Não'}</span>
+              </div>
+            </div>
+            <div class="item-hero-updated">Última atualização: ${timeAgo(lastUpdate)}</div>
+          </div>
+          ${lowConfidence ? `
+            <div class="item-hero-warning">
+              <span>⚠</span> Poucos registros — dado pode não refletir o mercado real.
+            </div>
+          ` : ''}
         </div>`;
-      }
 
-      html += `<div class="grid-4" style="gap:0.8rem;margin-bottom:1rem">
-        <div class="stat-box"><div class="value">${menor ? fmtPrice(menor) : '—'}</div><div class="label">Menor preço</div></div>
-        <div class="stat-box"><div class="value">${maior ? fmtPrice(maior) : '—'}</div><div class="label">Maior preço</div></div>
-        <div class="stat-box"><div class="value">${spread ?? '—'}%</div><div class="label">Spread</div></div>
-        <div class="stat-box"><div class="value">${recipe.has_recipe ? 'Sim' : 'Não'}</div><div class="label">Craftável</div></div>
-      </div>
-      <div style="font-size:0.7rem;color:var(--text-dim);margin-bottom:1rem">
-        Última atualização: ${timeAgo(lastUpdate)}
-      </div>`;
+      const sortedCities = [...latest].sort((a, b) => (a.sell_price_min || Infinity) - (b.sell_price_min || Infinity));
 
-      html += `<div class="grid-2" style="gap:1rem;align-items:start;margin-bottom:1rem">
-        <div class="card">
-          <div class="section-title">Preços por Cidade</div>
-          <table class="price-table">
-            <thead><tr><th>Cidade</th><th>Pedido de Venda</th><th>Pedido de Compra</th><th>Fonte</th><th>Atualizado</th></tr></thead>
-            <tbody>${latest.length ? latest.map(r => `<tr>
-              <td class="city">${r.city}
-                ${r.city === melhorCompraCidade ? ' <span style="color:var(--gold);font-size:0.6rem">(melhor compra)</span>' : ''}
-                ${r.city === melhorVendaCidade ? ' <span style="color:#27ae60;font-size:0.6rem">(melhor venda)</span>' : ''}
-              </td>
-              <td class="price">${fmtPrice(r.sell_price_min)}</td>
-              <td class="price">${fmtPrice(r.buy_price_max)}</td>
-              <td><span class="source-badge ${r.source}">${r.source === 'private' ? 'Privado' : 'AODP'}</span></td>
-              <td class="time-ago">${timeAgo(r.observed_at)}</td>
-            </tr>`).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--text-dim)">Sem dados disponíveis</td></tr>'}</tbody>
-          </table>
-        </div>
-        <div class="card">
-          <div class="section-title">Oportunidades</div>
-          ${renderOpportunities(flipData, recipe, latest, uniqueName)}
+      html += `<div class="item-route card" style="margin-bottom:1rem">
+        <div class="section-title">Rotas de Comércio</div>
+        <div class="route-flow">
+          ${sortedCities.map((r, i) => {
+            const isCheapest = r.city === melhorCompraCidade;
+            const isDearest = r.city === melhorVendaCidade;
+            const cityClass = isCheapest ? 'route-city--buy' : isDearest ? 'route-city--sell' : '';
+            return `
+              ${i > 0 ? '<div class="route-arrow"><span>→</span></div>' : ''}
+              <div class="route-city ${cityClass}">
+                <div class="route-city-name">${r.city}</div>
+                <div class="route-city-sell price-gold">${fmtPrice(r.sell_price_min)}</div>
+                <div class="route-city-buy">${r.buy_price_max ? fmtPrice(r.buy_price_max) : '—'}</div>
+                <div class="route-city-source">
+                  <span class="source-badge ${r.source}">${r.source === 'private' ? 'Privado' : 'AODP'}</span>
+                </div>
+              </div>
+            `;
+          }).join('')}
         </div>
       </div>`;
+
+      const hasOpportunity = flipData && flipData.net_profit > 0;
 
       if (history.length) {
-        html += `<div class="card" style="margin-bottom:1rem">
-          <div class="section-title">Gráfico de Preços</div>
-          <div class="pill-bar" id="chartRangeBar" style="margin-bottom:0.6rem">
-            <button class="pill active" data-hours="6">6h</button>
-            <button class="pill" data-hours="24">24h</button>
-            <button class="pill" data-hours="168">7d</button>
+        html += `<div class="item-chart-zone card" style="margin-bottom:1rem;position:relative">
+          <div class="item-chart-header">
+            <div class="section-title" style="margin-bottom:0">Histórico de Preços</div>
+            <div class="pill-bar" id="chartRangeBar">
+              <button class="pill" data-hours="6">6h</button>
+              <button class="pill active" data-hours="24">24h</button>
+              <button class="pill" data-hours="168">7d</button>
+            </div>
           </div>
-          <div class="chart-container"><canvas id="detailChart"></canvas></div>
-          <div class="grid-4" style="gap:0.6rem;margin-top:0.8rem" id="chartStatsRow"></div>
+          ${hasOpportunity ? `
+            <div class="item-chart-opp-overlay">
+              <div class="opp-badge opp-badge--flip">
+                <span class="opp-badge-icon">⚡</span>
+                <span class="opp-badge-label">FLIP</span>
+                <span class="opp-badge-profit price-green">+${fmtPrice(flipData.net_profit)} <small>(${flipData.roi_percent}%)</small></span>
+                <span class="opp-badge-route">${flipData.origin_city} → Black Market</span>
+              </div>
+            </div>
+          ` : ''}
+          ${recipe.has_recipe ? `
+            <div class="item-chart-opp-overlay item-chart-opp-overlay--below">
+              <div class="opp-badge opp-badge--craft">
+                <span class="opp-badge-icon">🔨</span>
+                <span class="opp-badge-label">CRAFT</span>
+                <span class="opp-badge-link"><a href="#/craft">Ver calculadora →</a></span>
+              </div>
+            </div>
+          ` : ''}
+          <div class="item-chart-canvas-wrap"><canvas id="detailChart"></canvas></div>
+          <div class="item-chart-stats" id="chartStatsRow"></div>
+        </div>`;
+      } else if (hasOpportunity || recipe.has_recipe) {
+        html += `<div class="card" style="margin-bottom:1rem">
+          ${hasOpportunity ? `
+            <div class="opp-badge opp-badge--flip" style="margin-bottom:0.5rem">
+              <span class="opp-badge-icon">⚡</span>
+              <span class="opp-badge-label">FLIP</span>
+              <span class="opp-badge-profit price-green">+${fmtPrice(flipData.net_profit)} <small>(${flipData.roi_percent}%)</small></span>
+              <span class="opp-badge-route">${flipData.origin_city} → Black Market</span>
+            </div>
+          ` : ''}
+          ${recipe.has_recipe ? `
+            <div class="opp-badge opp-badge--craft">
+              <span class="opp-badge-icon">🔨</span>
+              <span class="opp-badge-label">CRAFT</span>
+              <span class="opp-badge-link"><a href="#/craft">Ver calculadora completa →</a></span>
+            </div>
+          ` : ''}
         </div>`;
       }
 
       if (recipe.has_recipe) {
-        html += `<div class="card" style="margin-bottom:1rem" id="recipeBlock"></div>`;
+        html += `<div class="item-tree card" id="recipeBlock"></div>`;
       }
 
       panel.innerHTML = html;
@@ -364,7 +436,7 @@ Router.register('/itens', async (app) => {
       }
 
       if (recipe.has_recipe) {
-        renderInlineRecipe(recipe, latest, menor);
+        renderCraftTree(recipe, latest, menor);
       }
 
     } catch (e) {
@@ -372,29 +444,7 @@ Router.register('/itens', async (app) => {
     }
   }
 
-  function renderOpportunities(flipData, recipe, latest, uniqueName) {
-    const blocks = [];
-
-    if (flipData && flipData.net_profit > 0) {
-      blocks.push(`
-        <div style="border-left:3px solid var(--gold);padding:0.6rem 0.8rem;margin-bottom:0.6rem;background:rgba(201,169,78,0.06)">
-          <div style="font-size:0.7rem;color:var(--gold);font-weight:700;margin-bottom:0.2rem">OPORTUNIDADE DE FLIP</div>
-          <div style="font-size:0.8rem">Comprar em ${flipData.origin_city} e vender no Black Market</div>
-          <div style="font-size:0.85rem;color:#27ae60;font-weight:700">Lucro: ${fmtPrice(flipData.net_profit)} (${flipData.roi_percent}%)</div>
-        </div>
-      `);
-    } else {
-      blocks.push(`<div style="font-size:0.75rem;color:var(--text-dim);margin-bottom:0.6rem">Sem oportunidade válida de flip no momento.</div>`);
-    }
-
-    if (recipe.has_recipe) {
-      blocks.push(`<div style="font-size:0.7rem;color:var(--text-dim)">Craft: veja a seção "Receita de Craft" abaixo para custo detalhado.</div>`);
-    }
-
-    return blocks.join('');
-  }
-
-  async function renderInlineRecipe(recipe, latest, sellPrice) {
+  async function renderCraftTree(recipe, latest, sellPrice) {
     const block = document.getElementById('recipeBlock');
     if (!block) return;
     block.innerHTML = '<div class="section-title">Receita de Craft</div><div class="loading" style="font-size:0.75rem">Calculando custo...</div>';
@@ -408,29 +458,59 @@ Router.register('/itens', async (app) => {
         const rName = m.unique_name || m.resource_unique_name;
         const rCount = m.quantity || m.count;
         const mName = m.name_ptbr || rName;
+        const iconUrl = getItemIconUrl(rName);
         const prices = materialPricesArr[idx];
         const cityPrices = prices.filter(p => p.city && p.sell_price_min > 0);
         const cheapest = cityPrices.length ? cityPrices.reduce((a, b) => a.sell_price_min < b.sell_price_min ? a : b) : null;
         const unitPrice = cheapest ? cheapest.sell_price_min : 0;
-        return { name: mName, resource: rName, count: rCount, unitPrice, city: cheapest?.city, subtotal: unitPrice * rCount };
+        return { name: mName, resource: rName, count: rCount, unitPrice, city: cheapest?.city, subtotal: unitPrice * rCount, iconUrl };
       });
 
       const totalCost = rows.reduce((acc, r) => acc + r.subtotal, 0);
 
       block.innerHTML = `
         <div class="section-title">Receita de Craft</div>
-        <table class="price-table">
-          <thead><tr><th>Material</th><th>Qtd</th><th>Preço usado</th><th>Custo total</th></tr></thead>
-          <tbody>${rows.map(r => `<tr>
-            <td>${r.name}</td>
-            <td>${r.count}x</td>
-            <td class="price">${r.unitPrice ? `${fmtPrice(r.unitPrice)} (${r.city})` : 'sem dado'}</td>
-            <td class="price">${fmtPrice(r.subtotal)}</td>
-          </tr>`).join('')}</tbody>
-        </table>
-        <div style="margin-top:0.6rem;font-size:0.85rem;font-weight:700">Custo total: ${fmtPrice(totalCost)}</div>
-        ${sellPrice ? `<div style="font-size:0.8rem;color:${sellPrice - totalCost > 0 ? '#27ae60' : '#e74c3c'}">Lucro estimado (venda direta, sem taxa): ${fmtPrice(sellPrice - totalCost)}</div>` : ''}
-        <a href="#/craft" style="font-size:0.75rem;color:var(--gold);display:inline-block;margin-top:0.5rem">Ir para Calculadora de Craft completa →</a>
+        <div class="craft-tree">
+          <div class="craft-tree-root">
+            <div class="craft-tree-node craft-tree-node--final">
+              <img src="${getItemIconUrl(recipe.materials[0]?.unique_name ? recipe.materials[0].unique_name.replace(/T\d+_.*$/, selected.base) : '')}" class="craft-tree-node-icon" onerror="this.style.display='none'" />
+              <div class="craft-tree-node-info">
+                <span class="craft-tree-node-name">${recipe.recipe?.item_name || selected.base}</span>
+                <span class="craft-tree-node-sub">Item final</span>
+              </div>
+            </div>
+            <div class="craft-tree-stem"></div>
+            <div class="craft-tree-branches">
+              ${rows.map(r => `
+                <div class="craft-tree-branch">
+                  <div class="craft-tree-connector"></div>
+                  <div class="craft-tree-node">
+                    <img src="${r.iconUrl}" class="craft-tree-node-icon" onerror="this.style.display='none'" />
+                    <div class="craft-tree-node-info">
+                      <span class="craft-tree-node-name">${r.name}</span>
+                      <span class="craft-tree-node-sub">${r.count}x</span>
+                    </div>
+                    <div class="craft-tree-node-price">
+                      <span class="price-gold">${fmtPrice(r.subtotal)}</span>
+                      ${r.city ? `<span class="craft-tree-city">${r.city}</span>` : ''}
+                    </div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          <div class="craft-tree-footer">
+            <span>Custo total</span>
+            <span class="price-gold craft-tree-total">${fmtPrice(totalCost)}</span>
+          </div>
+          ${sellPrice ? `
+            <div class="craft-tree-profit">
+              Lucro estimado (venda direta, sem taxa):
+              <span class="${sellPrice - totalCost > 0 ? 'price-green' : 'price-red'}">${fmtPrice(sellPrice - totalCost)}</span>
+            </div>
+          ` : ''}
+          <a href="#/craft" class="craft-tree-link">Calculadora de Craft completa →</a>
+        </div>
       `;
     } catch (e) {
       block.innerHTML = `<div class="section-title">Receita de Craft</div><div style="font-size:0.75rem;color:#e74c3c">Erro ao calcular: ${e.message}</div>`;
@@ -467,10 +547,22 @@ Router.register('/itens', async (app) => {
     const statsRow = document.getElementById('chartStatsRow');
     if (statsRow) {
       statsRow.innerHTML = `
-        <div class="stat-box"><div class="value">${fmtPrice(last)}</div><div class="label">Último</div></div>
-        <div class="stat-box"><div class="value">${fmtPrice(Math.round(avg))}</div><div class="label">Média</div></div>
-        <div class="stat-box"><div class="value">${variacao}%</div><div class="label">Variação</div></div>
-        <div class="stat-box"><div class="value" style="color:${tendencia === 'alta' ? '#27ae60' : tendencia === 'baixa' ? '#e74c3c' : 'var(--text-dim)'}">${tendencia}</div><div class="label">Tendência</div></div>
+        <div class="item-chart-stat">
+          <span class="item-chart-stat-label">Último</span>
+          <span class="item-chart-stat-value price-gold">${fmtPrice(last)}</span>
+        </div>
+        <div class="item-chart-stat">
+          <span class="item-chart-stat-label">Média</span>
+          <span class="item-chart-stat-value price-purple">${fmtPrice(Math.round(avg))}</span>
+        </div>
+        <div class="item-chart-stat">
+          <span class="item-chart-stat-label">Variação</span>
+          <span class="item-chart-stat-value ${variacao > 0 ? 'price-green' : variacao < 0 ? 'price-red' : 'price-dim'}">${variacao}%</span>
+        </div>
+        <div class="item-chart-stat">
+          <span class="item-chart-stat-label">Tendência</span>
+          <span class="item-chart-stat-value ${tendencia === 'alta' ? 'price-green' : tendencia === 'baixa' ? 'price-red' : 'price-dim'}">${tendencia}</span>
+        </div>
       `;
     }
 
