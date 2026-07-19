@@ -90,4 +90,10 @@ app.listen(config.port, () => {
   }
   setInterval(autoSync, SYNC_INTERVAL);
   autoSync();
+
+  const STALE_REFRESH_INTERVAL = 15 * 60 * 1000;
+  setInterval(() => {
+    const { refreshStaleItems } = require('./services/publicSync');
+    refreshStaleItems(50).catch(err => console.error('[refreshStaleItems]', err));
+  }, STALE_REFRESH_INTERVAL);
 });

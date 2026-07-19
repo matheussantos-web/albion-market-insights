@@ -2,16 +2,6 @@ function fmtPrice(v) {
   if (!v && v !== 0) return '—';
   return Number(v).toLocaleString('pt-BR');
 }
-function timeAgo(dateStr) {
-  if (!dateStr) return '—';
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const min = Math.floor(diff / 60000);
-  if (min < 1) return 'agora';
-  if (min < 60) return min + 'min';
-  const h = Math.floor(min / 60);
-  if (h < 24) return h + 'h';
-  return Math.floor(h / 24) + 'd';
-}
 
 const TIER_COLORS = { 3: '#6b6b6b', 4: '#2d8f2d', 5: '#2277dd', 6: '#9944cc', 7: '#dd7700', 8: '#cc2222' };
 
@@ -267,94 +257,114 @@ Router.register('/itens', async (app) => {
       return;
     }
 
-    const itemId = variant.unique_name;
+    await loadVariantDetail(variant.unique_name, variant.name_ptbr || selected.base, selected.tier);
+  }
+
+  async function loadVariantDetail(uniqueName, itemName, tier) {
     const panel = document.getElementById('itemResultPanel');
-    panel.innerHTML = '<div class="loading">Carregando preços...</div>';
+    panel.innerHTML = '<div class="loading">Carregando...</div>';
 
     try {
-      const [latest, history] = await Promise.all([
-        getLatestPrices(itemId, 1),
-        getPriceHistory(itemId, 500, 1),
+      const [latest, history, recipeData, flipData] = await Promise.all([
+        getLatestPrices(uniqueName, 1),
+        getPriceHistory(uniqueName, 500, 1),
+        getRecipe(uniqueName),
+        getFlipperForItem(uniqueName),
       ]);
+
+      const recipe = { has_recipe: !!(recipeData && recipeData.recipe), materials: (recipeData && recipeData.resources) || [] };
       const lowConfidence = latest.low_confidence || history.low_confidence;
+
+      const sells = latest.map(r => r.sell_price_min).filter(Boolean);
+      const menor = sells.length ? Math.min(...sells) : null;
+      const maior = sells.length ? Math.max(...sells) : null;
+      const spread = (menor && maior) ? (((maior - menor) / menor) * 100).toFixed(1) : null;
+      const melhorCompraCidade = menor ? latest.find(r => r.sell_price_min === menor)?.city : null;
+      const melhorVendaCidade = maior ? latest.find(r => r.sell_price_min === maior)?.city : null;
+      const lastUpdate = latest.length
+        ? latest.reduce((a, b) => new Date(a.observed_at) > new Date(b.observed_at) ? a : b).observed_at
+        : null;
 
       let html = '';
 
-      html += `<div style="display:flex;align-items:baseline;gap:0.75rem;margin-bottom:1rem;flex-wrap:wrap">
-        <h2 style="font-size:1.1rem;font-weight:700">${variant.name_ptbr || selected.base}</h2>
-        <span style="font-family:monospace;font-size:0.7rem;color:var(--text-dim)">${itemId}</span>
-        <span class="badge badge-gold" style="background:${TIER_COLORS[selected.tier] || '#888'}">T${selected.tier}</span>
+      html += `<div style="display:flex;align-items:baseline;gap:0.75rem;margin-bottom:0.8rem;flex-wrap:wrap">
+        <h2 style="font-size:1.1rem;font-weight:700">${itemName}</h2>
+        <span style="font-family:monospace;font-size:0.7rem;color:var(--text-dim)">${uniqueName}</span>
+        <span class="badge badge-gold" style="background:${TIER_COLORS[tier] || '#888'}">T${tier}</span>
         ${selected.enchantment > 0 ? `<span class="badge badge-purple">@${selected.enchantment}</span>` : ''}
         <span class="badge badge-surface">${selected.category}</span>
       </div>`;
 
-      if (latest.length) {
-        html += `<div class="card" style="margin-bottom:1rem">
+      if (lowConfidence) {
+        html += `<div style="font-size:0.7rem;color:var(--warning,#e67e22);margin-bottom:1rem;padding:0.4rem 0.6rem;background:rgba(230,126,34,0.08);border-radius:4px;border-left:3px solid var(--warning,#e67e22)">
+          &#9888; Poucos registros disponíveis — dado pode não refletir o mercado real.
+        </div>`;
+      }
+
+      html += `<div class="grid-4" style="gap:0.8rem;margin-bottom:1rem">
+        <div class="stat-box"><div class="value">${menor ? fmtPrice(menor) : '—'}</div><div class="label">Menor preço</div></div>
+        <div class="stat-box"><div class="value">${maior ? fmtPrice(maior) : '—'}</div><div class="label">Maior preço</div></div>
+        <div class="stat-box"><div class="value">${spread ?? '—'}%</div><div class="label">Spread</div></div>
+        <div class="stat-box"><div class="value">${recipe.has_recipe ? 'Sim' : 'Não'}</div><div class="label">Craftável</div></div>
+      </div>
+      <div style="font-size:0.7rem;color:var(--text-dim);margin-bottom:1rem">
+        Última atualização: ${timeAgo(lastUpdate)}
+      </div>`;
+
+      html += `<div class="grid-2" style="gap:1rem;align-items:start;margin-bottom:1rem">
+        <div class="card">
           <div class="section-title">Preços por Cidade</div>
           <table class="price-table">
-            <thead><tr><th>Cidade</th><th>Venda min</th><th>Venda max</th><th>Compra min</th><th>Compra max</th><th>Fonte</th><th>Atualizado</th></tr></thead>
-            <tbody>${latest.map(r => `<tr>
-              <td class="city">${r.city}</td>
+            <thead><tr><th>Cidade</th><th>Pedido de Venda</th><th>Pedido de Compra</th><th>Fonte</th><th>Atualizado</th></tr></thead>
+            <tbody>${latest.length ? latest.map(r => `<tr>
+              <td class="city">${r.city}
+                ${r.city === melhorCompraCidade ? ' <span style="color:var(--gold);font-size:0.6rem">(melhor compra)</span>' : ''}
+                ${r.city === melhorVendaCidade ? ' <span style="color:#27ae60;font-size:0.6rem">(melhor venda)</span>' : ''}
+              </td>
               <td class="price">${fmtPrice(r.sell_price_min)}</td>
-              <td class="price">${fmtPrice(r.sell_price_max)}</td>
-              <td class="price">${fmtPrice(r.buy_price_min)}</td>
               <td class="price">${fmtPrice(r.buy_price_max)}</td>
               <td><span class="source-badge ${r.source}">${r.source === 'private' ? 'Privado' : 'AODP'}</span></td>
               <td class="time-ago">${timeAgo(r.observed_at)}</td>
-            </tr>`).join('')}</tbody>
+            </tr>`).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--text-dim)">Sem dados disponíveis</td></tr>'}</tbody>
           </table>
-        </div>`;
-      } else {
-        html += '<div class="card" style="margin-bottom:1rem;padding:1.5rem;text-align:center;color:var(--text-dim);font-size:0.8rem">Sem dados de preço disponíveis</div>';
-      }
+        </div>
+        <div class="card">
+          <div class="section-title">Oportunidades</div>
+          ${renderOpportunities(flipData, recipe, latest, uniqueName)}
+        </div>
+      </div>`;
 
       if (history.length) {
-        const sells = history.filter(h => h.sell_price_min).map(h => h.sell_price_min);
-        const buys = history.filter(h => h.buy_price_min).map(h => h.buy_price_min);
-        const avgSell = sells.length ? Math.round(sells.reduce((a, b) => a + b, 0) / sells.length) : 0;
-        const minSell = sells.length ? Math.min(...sells) : 0;
-        const maxSell = sells.length ? Math.max(...sells) : 0;
-        const avgBuy = buys.length ? Math.round(buys.reduce((a, b) => a + b, 0) / buys.length) : 0;
-
-        const lowConfidenceHtml = lowConfidence
-          ? `<div style="font-size:0.7rem;color:var(--warning,#e67e22);margin-top:0.5rem;padding:0.4rem 0.6rem;background:rgba(230,126,34,0.08);border-radius:4px;border-left:3px solid var(--warning,#e67e22)">
-              &#9888; Poucos registros disponíveis (${history.length}) — dado pode não refletir o mercado real.
-            </div>`
-          : '';
-
         html += `<div class="card" style="margin-bottom:1rem">
-          <div class="section-title">Estatísticas</div>
-          <div class="grid-3">
-            <div class="stat-box"><div class="value">${fmtPrice(avgSell)}</div><div class="label">Venda médio</div></div>
-            <div class="stat-box"><div class="value">${fmtPrice(minSell)}</div><div class="label">Venda mín</div></div>
-            <div class="stat-box"><div class="value">${fmtPrice(maxSell)}</div><div class="label">Venda máx</div></div>
-            <div class="stat-box"><div class="value">${fmtPrice(avgBuy)}</div><div class="label">Compra médio</div></div>
-            <div class="stat-box"><div class="value">${history.length}</div><div class="label">Registros</div></div>
-            <div class="stat-box"><div class="value">${new Set(history.map(h => h.city)).size}</div><div class="label">Cidades</div></div>
-          </div>
-          ${lowConfidenceHtml}
-        </div>`;
-
-        html += `<div class="card">
           <div class="section-title">Gráfico de Preços</div>
-          <div class="chart-controls" id="itemDetailMetric">
-            <button class="active" data-metric="sell">Venda</button>
-            <button data-metric="buy">Compra</button>
+          <div class="pill-bar" id="chartRangeBar" style="margin-bottom:0.6rem">
+            <button class="pill active" data-hours="6">6h</button>
+            <button class="pill" data-hours="24">24h</button>
+            <button class="pill" data-hours="168">7d</button>
           </div>
-          <div class="chart-container"><canvas id="itemDetailChart"></canvas></div>
+          <div class="chart-container"><canvas id="detailChart"></canvas></div>
+          <div class="grid-4" style="gap:0.6rem;margin-top:0.8rem" id="chartStatsRow"></div>
         </div>`;
+      }
+
+      if (recipe.has_recipe) {
+        html += `<div class="card" style="margin-bottom:1rem" id="recipeBlock"></div>`;
       }
 
       panel.innerHTML = html;
 
       if (history.length) {
-        drawDetailChart(history, 'sell');
-        document.getElementById('itemDetailMetric').addEventListener('click', (e) => {
+        renderDetailChart(history, 24);
+        document.getElementById('chartRangeBar').addEventListener('click', (e) => {
           const btn = e.target.closest('button');
           if (!btn) return;
-          document.querySelectorAll('#itemDetailMetric button').forEach(b => b.classList.toggle('active', b === btn));
-          drawDetailChart(history, btn.dataset.metric);
+          document.querySelectorAll('#chartRangeBar button').forEach(b => b.classList.toggle('active', b === btn));
+          renderDetailChart(history, Number(btn.dataset.hours));
         });
+      }
+
+      if (recipe.has_recipe) {
+        renderInlineRecipe(recipe, latest, menor);
       }
 
     } catch (e) {
@@ -362,30 +372,112 @@ Router.register('/itens', async (app) => {
     }
   }
 
-  function drawDetailChart(history, metric) {
+  function renderOpportunities(flipData, recipe, latest, uniqueName) {
+    const blocks = [];
+
+    if (flipData && flipData.net_profit > 0) {
+      blocks.push(`
+        <div style="border-left:3px solid var(--gold);padding:0.6rem 0.8rem;margin-bottom:0.6rem;background:rgba(201,169,78,0.06)">
+          <div style="font-size:0.7rem;color:var(--gold);font-weight:700;margin-bottom:0.2rem">OPORTUNIDADE DE FLIP</div>
+          <div style="font-size:0.8rem">Comprar em ${flipData.origin_city} e vender no Black Market</div>
+          <div style="font-size:0.85rem;color:#27ae60;font-weight:700">Lucro: ${fmtPrice(flipData.net_profit)} (${flipData.roi_percent}%)</div>
+        </div>
+      `);
+    } else {
+      blocks.push(`<div style="font-size:0.75rem;color:var(--text-dim);margin-bottom:0.6rem">Sem oportunidade válida de flip no momento.</div>`);
+    }
+
+    if (recipe.has_recipe) {
+      blocks.push(`<div style="font-size:0.7rem;color:var(--text-dim)">Craft: veja a seção "Receita de Craft" abaixo para custo detalhado.</div>`);
+    }
+
+    return blocks.join('');
+  }
+
+  async function renderInlineRecipe(recipe, latest, sellPrice) {
+    const block = document.getElementById('recipeBlock');
+    if (!block) return;
+    block.innerHTML = '<div class="section-title">Receita de Craft</div><div class="loading" style="font-size:0.75rem">Calculando custo...</div>';
+
+    try {
+      const materialPricesArr = await Promise.all(
+        recipe.materials.map(m => getLatestPrices(m.unique_name || m.resource_unique_name).catch(() => []))
+      );
+
+      const rows = recipe.materials.map((m, idx) => {
+        const rName = m.unique_name || m.resource_unique_name;
+        const rCount = m.quantity || m.count;
+        const mName = m.name_ptbr || rName;
+        const prices = materialPricesArr[idx];
+        const cityPrices = prices.filter(p => p.city && p.sell_price_min > 0);
+        const cheapest = cityPrices.length ? cityPrices.reduce((a, b) => a.sell_price_min < b.sell_price_min ? a : b) : null;
+        const unitPrice = cheapest ? cheapest.sell_price_min : 0;
+        return { name: mName, resource: rName, count: rCount, unitPrice, city: cheapest?.city, subtotal: unitPrice * rCount };
+      });
+
+      const totalCost = rows.reduce((acc, r) => acc + r.subtotal, 0);
+
+      block.innerHTML = `
+        <div class="section-title">Receita de Craft</div>
+        <table class="price-table">
+          <thead><tr><th>Material</th><th>Qtd</th><th>Preço usado</th><th>Custo total</th></tr></thead>
+          <tbody>${rows.map(r => `<tr>
+            <td>${r.name}</td>
+            <td>${r.count}x</td>
+            <td class="price">${r.unitPrice ? `${fmtPrice(r.unitPrice)} (${r.city})` : 'sem dado'}</td>
+            <td class="price">${fmtPrice(r.subtotal)}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+        <div style="margin-top:0.6rem;font-size:0.85rem;font-weight:700">Custo total: ${fmtPrice(totalCost)}</div>
+        ${sellPrice ? `<div style="font-size:0.8rem;color:${sellPrice - totalCost > 0 ? '#27ae60' : '#e74c3c'}">Lucro estimado (venda direta, sem taxa): ${fmtPrice(sellPrice - totalCost)}</div>` : ''}
+        <a href="#/craft" style="font-size:0.75rem;color:var(--gold);display:inline-block;margin-top:0.5rem">Ir para Calculadora de Craft completa →</a>
+      `;
+    } catch (e) {
+      block.innerHTML = `<div class="section-title">Receita de Craft</div><div style="font-size:0.75rem;color:#e74c3c">Erro ao calcular: ${e.message}</div>`;
+    }
+  }
+
+  function renderDetailChart(history, hours) {
+    const cutoff = Date.now() - hours * 60 * 60 * 1000;
+    const filtered = history.filter(r => new Date(r.observed_at).getTime() >= cutoff);
+
     const CITY_COLORS = {
       'Caerleon': '#c9a94e', 'Bridgewatch': '#e67e22', 'Lymhurst': '#27ae60',
       'Martlock': '#3498db', 'Fort Sterling': '#ecf0f1', 'Thetford': '#8e44ad', 'Black Market': '#e74c3c',
     };
-
     const byCity = {};
-    for (const row of [...history].reverse()) {
+    for (const row of [...filtered].reverse()) {
       if (!byCity[row.city]) byCity[row.city] = [];
       byCity[row.city].push(row);
     }
-
-    const canvas = document.getElementById('itemDetailChart');
-    if (!canvas) return;
-
     const datasets = Object.entries(byCity).map(([city, rows]) => ({
       label: city,
-      data: rows.map(r => ({ x: new Date(r.observed_at), y: metric === 'sell' ? (r.sell_price_min || r.sell_price_max) : (r.buy_price_min || r.buy_price_max) })),
+      data: rows.map(r => ({ x: new Date(r.observed_at), y: r.sell_price_min || r.sell_price_max })),
       borderColor: CITY_COLORS[city] || '#888', backgroundColor: 'transparent',
       borderWidth: 1.5, pointRadius: 2, pointHoverRadius: 5, tension: 0.3,
     }));
 
-    if (canvas._chartInstance) canvas._chartInstance.destroy();
-    canvas._chartInstance = new Chart(canvas, {
+    const allValues = filtered.map(r => r.sell_price_min || r.sell_price_max).filter(Boolean);
+    const avg = allValues.length ? allValues.reduce((a, b) => a + b, 0) / allValues.length : 0;
+    const first = filtered.length ? (filtered[filtered.length - 1].sell_price_min || 0) : 0;
+    const last = filtered.length ? (filtered[0].sell_price_min || 0) : 0;
+    const variacao = first ? (((last - first) / first) * 100).toFixed(1) : 0;
+    const tendencia = variacao > 2 ? 'alta' : variacao < -2 ? 'baixa' : 'lateral';
+
+    const statsRow = document.getElementById('chartStatsRow');
+    if (statsRow) {
+      statsRow.innerHTML = `
+        <div class="stat-box"><div class="value">${fmtPrice(last)}</div><div class="label">Último</div></div>
+        <div class="stat-box"><div class="value">${fmtPrice(Math.round(avg))}</div><div class="label">Média</div></div>
+        <div class="stat-box"><div class="value">${variacao}%</div><div class="label">Variação</div></div>
+        <div class="stat-box"><div class="value" style="color:${tendencia === 'alta' ? '#27ae60' : tendencia === 'baixa' ? '#e74c3c' : 'var(--text-dim)'}">${tendencia}</div><div class="label">Tendência</div></div>
+      `;
+    }
+
+    const ctx = document.getElementById('detailChart');
+    if (!ctx) return;
+    if (window.__detailChartInstance) window.__detailChartInstance.destroy();
+    window.__detailChartInstance = new Chart(ctx, {
       type: 'line', data: { datasets },
       options: {
         responsive: true, maintainAspectRatio: false,

@@ -145,4 +145,30 @@ async function fetchItemFromAodp(itemId, { region = config.publicSyncRegion } = 
   return insertMany(rows);
 }
 
-module.exports = { syncPublicPrices, fetchItemFromAodp, REGIONS };
+module.exports = { syncPublicPrices, fetchItemFromAodp, refreshStaleItems, REGIONS };
+
+async function refreshStaleItems(limit = 50) {
+  const db = getDb();
+  const staleItems = db.prepare(`
+    SELECT DISTINCT item_unique_name FROM market_prices
+    WHERE source = 'public_adp'
+      AND item_unique_name IN (
+        SELECT item_unique_name FROM market_prices
+        GROUP BY item_unique_name
+        HAVING MAX(observed_at) < datetime('now', '-1 hour')
+      )
+    LIMIT ?
+  `).all(limit);
+
+  if (staleItems.length === 0) return;
+
+  console.log(`[refreshStaleItems] revalidando ${staleItems.length} itens...`);
+  for (const { item_unique_name } of staleItems) {
+    try {
+      await fetchItemFromAodp(item_unique_name);
+      await new Promise(r => setTimeout(r, 500));
+    } catch (err) {
+      console.error(`[refreshStaleItems] falha em ${item_unique_name}: ${err.message}`);
+    }
+  }
+}

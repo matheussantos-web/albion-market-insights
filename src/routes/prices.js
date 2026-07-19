@@ -108,11 +108,19 @@ router.get('/:uniqueName', async (req, res) => {
 });
 
 // GET /api/prices/:uniqueName/latest — preço atual agrupado por cidade
+const STALE_THRESHOLD_MS = 60 * 60 * 1000; // 1 hora
+
+function isStale(rows) {
+  if (!rows.length) return true;
+  const mostRecent = Math.max(...rows.map(r => new Date(r.observed_at).getTime()));
+  return (Date.now() - mostRecent) > STALE_THRESHOLD_MS;
+}
+
 router.get('/:uniqueName/latest', async (req, res) => {
   const quality = req.query.quality ? Number(req.query.quality) : null;
   const cacheKey = `${req.params.uniqueName}:latest${quality ? ':q' + quality : ''}`;
   const cached = cache.get(cacheKey);
-  if (cached && cached.data) return res.json(cached);
+  if (cached && cached.data && !isStale(cached.data)) return res.json(cached);
 
   const db = getDb();
   const itemName = req.params.uniqueName;
@@ -127,13 +135,13 @@ router.get('/:uniqueName/latest', async (req, res) => {
   if (quality) params.push(quality);
   let rows = db.prepare(sql).all(...params);
 
-  if (rows.length === 0) {
+  if (isStale(rows)) {
     const { fetchItemFromAodp } = require('../services/publicSync');
     try {
       await fetchItemFromAodp(itemName);
       rows = db.prepare(sql).all(...params);
     } catch (err) {
-      console.error(`[prices/latest] fallback AODP falhou para ${itemName}: ${err.message}`);
+      console.error(`[prices/latest] refresh AODP falhou para ${itemName}: ${err.message}`);
     }
   }
 

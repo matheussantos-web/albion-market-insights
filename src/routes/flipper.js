@@ -59,6 +59,7 @@ router.get('/', (req, res) => {
       sort = 'profit',
       limit = 50,
       scope = 'all',
+      itemFilter = '',
     } = req.query;
 
     const taxRate = premium === 'true' ? 0.025 : 0.04;
@@ -146,10 +147,15 @@ router.get('/', (req, res) => {
       : (a, b) => b.net_profit - a.net_profit
     );
 
+    let filtered = opportunities;
+    if (itemFilter) {
+      filtered = opportunities.filter(o => o.item_id === itemFilter);
+    }
+
     res.json({
       mode: 'blackmarket',
-      opportunities: opportunities.slice(0, Number(limit)),
-      total_found: opportunities.length,
+      opportunities: filtered.slice(0, Number(limit)),
+      total_found: filtered.length,
       generated_at: new Date().toISOString(),
       tax_rate: taxRate,
       origin_city: originCity,

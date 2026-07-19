@@ -79,3 +79,23 @@ async function getRecipe(uniqueName) {
 async function searchRecipes(q) {
   return apiGet(`/api/craft/search?q=${encodeURIComponent(q)}`);
 }
+
+function timeAgo(dateStr) {
+  if (!dateStr) return '—';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return 'agora';
+  if (min < 60) return min + 'min';
+  const h = Math.floor(min / 60);
+  if (h < 24) return h + 'h';
+  return Math.floor(h / 24) + 'd';
+}
+
+async function getFlipperForItem(uniqueName) {
+  try {
+    const data = await apiGet(`/api/flipper?itemFilter=${encodeURIComponent(uniqueName)}`);
+    return data.opportunities && data.opportunities.length ? data.opportunities[0] : null;
+  } catch (e) {
+    return null;
+  }
+}
