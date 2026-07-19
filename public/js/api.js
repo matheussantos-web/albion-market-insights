@@ -91,6 +91,14 @@ function timeAgo(dateStr) {
   return Math.floor(h / 24) + 'd';
 }
 
+async function hasRecipe(uniqueName) {
+  try {
+    return await apiGet(`/api/craft/has-recipe/${encodeURIComponent(uniqueName)}`);
+  } catch (e) {
+    return { has_recipe: false, level: null };
+  }
+}
+
 async function getFlipperForItem(uniqueName) {
   try {
     const data = await apiGet(`/api/flipper?itemFilter=${encodeURIComponent(uniqueName)}`);

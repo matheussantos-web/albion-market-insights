@@ -269,14 +269,21 @@ Router.register('/itens', async (app) => {
     panel.innerHTML = '<div class="loading">Carregando...</div>';
 
     try {
-      const [latest, history, recipeData, flipData] = await Promise.all([
+      const enchantLevel = parseInt(String(uniqueName).match(/@(\d+)$/)?.[1] || '0', 10);
+
+      const [latest, history, recipeData, flipData, recipeCheck] = await Promise.all([
         getLatestPrices(uniqueName, 1),
         getPriceHistory(uniqueName, 500, 1),
         getRecipe(uniqueName),
         getFlipperForItem(uniqueName),
+        hasRecipe(uniqueName),
       ]);
 
-      const recipe = { has_recipe: !!(recipeData && recipeData.recipe), materials: (recipeData && recipeData.resources) || [] };
+      const hasDirectRecipe = !!(recipeData && recipeData.recipe);
+      const recipeLevel = recipeData.recipe_level || recipeCheck.level;
+      const isCraftable = hasDirectRecipe || recipeCheck.has_recipe || enchantLevel > 0;
+      const hasExactRecipe = recipeLevel === 'direct';
+      const recipe = { has_recipe: isCraftable, materials: (recipeData && recipeData.resources) || [], recipe_level: recipeLevel, has_exact: hasExactRecipe };
       const lowConfidence = latest.low_confidence || history.low_confidence;
 
       const sells = latest.map(r => r.sell_price_min).filter(Boolean);
@@ -447,6 +454,26 @@ Router.register('/itens', async (app) => {
   async function renderCraftTree(recipe, latest, sellPrice) {
     const block = document.getElementById('recipeBlock');
     if (!block) return;
+
+    const uniqueName = variants.find(v => v.tier === selected.tier && v.enchantment === selected.enchantment)?.unique_name || '';
+    const enchantLevel = parseInt(String(uniqueName).match(/@(\d+)$/)?.[1] || '0', 10);
+
+    if (enchantLevel > 0 && !recipe.has_exact) {
+      block.innerHTML = `
+        <div class="section-title">Receita de Craft</div>
+        <div class="craft-tree">
+          <div class="craft-tree-upgrade-notice">
+            <div class="craft-tree-upgrade-icon">⬆</div>
+            <div class="craft-tree-upgrade-info">
+              <span class="craft-tree-upgrade-title">Upgrade via Runa/Alma/Relíquia</span>
+              <span class="craft-tree-upgrade-desc">Este item não tem receita de craft direta. O caminho é fazer o item base @0 e aplicar encantamento.</span>
+            </div>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
     block.innerHTML = '<div class="section-title">Receita de Craft</div><div class="loading" style="font-size:0.75rem">Calculando custo...</div>';
 
     try {

@@ -1566,6 +1566,36 @@ a:hover { color: var(--text); }
   margin-top: 0.4rem;
 }
 
+.craft-tree-upgrade-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  padding: 1rem;
+  background: rgba(167,139,250,0.06);
+  border: 1px solid rgba(167,139,250,0.2);
+  border-radius: 8px;
+}
+.craft-tree-upgrade-icon {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+  padding-top: 0.1rem;
+}
+.craft-tree-upgrade-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.craft-tree-upgrade-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--purple);
+}
+.craft-tree-upgrade-desc {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+
 /* ── Flipper v2 ── */
 .flipper-page-header {
   display: flex;
