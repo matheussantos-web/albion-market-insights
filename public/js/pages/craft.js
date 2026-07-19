@@ -40,13 +40,18 @@ Router.register('/craft', async (app) => {
   `;
 
   const CITIES = ['Caerleon', 'Bridgewatch', 'Lymhurst', 'Martlock', 'Fort Sterling', 'Thetford'];
-  let selectedCity = 'Caerleon';
+  let selectedCity = null;
   let selectedItem = null;
   let recipeData = null;
 
+  function safeMin(arr) {
+    const valid = arr.filter(v => v > 0 && isFinite(v));
+    return valid.length ? Math.min(...valid) : 0;
+  }
+
   const citiesDiv = document.getElementById('craftCities');
   citiesDiv.innerHTML = CITIES.map(c =>
-    `<button class="badge ${c === selectedCity ? 'badge-gold' : 'badge-surface'}" style="cursor:pointer;border:none" data-city="${c}">${c}</button>`
+    `<button class="badge badge-surface" style="cursor:pointer;border:none" data-city="${c}">${c}</button>`
   ).join('');
 
   citiesDiv.addEventListener('click', (e) => {
@@ -138,6 +143,10 @@ Router.register('/craft', async (app) => {
       result.innerHTML = '<div class="card" style="border-left:3px solid #e74c3c;padding:1rem;color:#e74c3c">Selecione um item primeiro</div>';
       return;
     }
+    if (!selectedCity) {
+      result.innerHTML = '<div class="card" style="border-left:3px solid #e67e22;padding:1rem;color:#e67e22">Selecione uma cidade de venda acima</div>';
+      return;
+    }
     if (!recipeData || !recipeData.recipe) {
       result.innerHTML = '<div class="card" style="border-left:3px solid #e67e22;padding:1rem;color:#e67e22">Este item não possui receita de craft.</div>';
       return;
@@ -162,18 +171,21 @@ Router.register('/craft', async (app) => {
       const sellPrices = allPrices[allPrices.length - 1];
 
       const citySellData = sellPrices.filter(p => p.city === selectedCity);
-      const sellMin = citySellData.length ? Math.min(...citySellData.map(p => p.sell_price_min).filter(p => p > 0)) : 0;
+      const sellMin = safeMin(citySellData.map(p => p.sell_price_min));
 
       const taxRate = 1 - (tax / 100);
       const effectiveReturn = 1 - (returnRate / 100);
 
       let totalMaterialCost = 0;
+      let missingDataCount = 0;
       const breakdown = [];
 
       for (const r of recipeData.resources) {
         const prices = resourcePrices[r.resource_unique_name] || [];
         const cityPrices = prices.filter(p => p.city === selectedCity);
-        const buyPrice = cityPrices.length ? Math.min(...cityPrices.filter(p => p.buy_price_min > 0).map(p => p.buy_price_min)) : 0;
+        const buyPrice = safeMin(cityPrices.map(p => p.buy_price_min));
+        const hasData = buyPrice > 0;
+        if (!hasData) missingDataCount++;
 
         const lineCost = buyPrice * r.count * qty;
         totalMaterialCost += lineCost;
@@ -182,7 +194,7 @@ Router.register('/craft', async (app) => {
         for (const city of CITIES) {
           const cp = prices.filter(p => p.city === city);
           allCityPrices[city] = {
-            buy: cp.length ? Math.min(...cp.filter(p => p.buy_price_min > 0).map(p => p.buy_price_min)) : 0,
+            buy: safeMin(cp.map(p => p.buy_price_min)),
           };
         }
 
@@ -193,6 +205,7 @@ Router.register('/craft', async (app) => {
           buyPrice,
           lineCost,
           allCityPrices,
+          hasData,
         });
       }
 
@@ -207,24 +220,37 @@ Router.register('/craft', async (app) => {
       const allCitiesSummary = {};
       for (const city of CITIES) {
         const cd = sellPrices.filter(p => p.city === city);
-        allCitiesSummary[city] = cd.length ? Math.min(...cd.filter(p => p.sell_price_min > 0).map(p => p.sell_price_min)) : 0;
+        allCitiesSummary[city] = safeMin(cd.map(p => p.sell_price_min));
       }
+
+      const missingWarning = missingDataCount > 0
+        ? `<div style="margin-top:0.8rem;padding:0.5rem 0.75rem;background:rgba(230,126,34,0.1);border:1px solid rgba(230,126,34,0.2);border-radius:6px;font-size:0.75rem;color:#e67e22">
+             <strong>⚠ ${missingDataCount} material(is) sem preço em ${selectedCity}.</strong> O custo total está subestimado —some os preços faltando manualmente para um resultado preciso.
+           </div>`
+        : '';
+
+      const sellMissing = sellMin === 0
+        ? `<div style="margin-top:0.5rem;padding:0.4rem 0.6rem;background:rgba(230,126,34,0.1);border:1px solid rgba(230,126,34,0.2);border-radius:6px;font-size:0.75rem;color:#e67e22">
+             <strong>⚠ Sem preço de venda em ${selectedCity}.</strong> A receita e o lucro não podem ser calculados. Tente outra cidade.
+           </div>`
+        : '';
 
       result.innerHTML = `
         <div class="card" style="margin-bottom:1rem">
           <div class="section-title">Resultado: ${selectedItem.name} x${qty}</div>
+          ${sellMissing}
           <div class="grid-3" style="gap:1rem;margin-top:0.5rem">
             <div class="stat-box" style="border-left:3px solid #e74c3c">
-              <div class="value" style="font-size:1rem">${fmt(Math.round(totalCost))}</div>
+              <div class="value" style="font-size:1rem">${sellMin > 0 ? fmt(Math.round(totalCost)) : '—'}</div>
               <div class="label">Custo total (materiais + prata)</div>
             </div>
             <div class="stat-box" style="border-left:3px solid #27ae60">
-              <div class="value" style="font-size:1rem">${fmt(Math.round(sellRevenue))}</div>
+              <div class="value" style="font-size:1rem">${sellMin > 0 ? fmt(Math.round(sellRevenue)) : '—'}</div>
               <div class="label">Receita (${selectedCity}, ${tax}% tax)</div>
             </div>
             <div class="stat-box" style="border-left:3px solid ${profit > 0 ? '#27ae60' : '#e74c3c'}">
               <div class="value" style="font-size:1.1rem;color:${profit > 0 ? '#27ae60' : '#e74c3c'}">
-                ${fmt(Math.round(profit))} <span style="font-size:0.75rem">(${margin}%)</span>
+                ${sellMin > 0 ? `${fmt(Math.round(profit))} <span style="font-size:0.75rem">(${margin}%)</span>` : '—'}
               </div>
               <div class="label">Lucro (${returnRate}% return rate)</div>
             </div>
@@ -236,6 +262,7 @@ Router.register('/craft', async (app) => {
             Retorno (${returnRate}%): -${fmt(Math.round(returnedMaterials))} &nbsp;|&nbsp;
             Receita final: ${fmt(Math.round(sellRevenue))}
           </div>
+          ${missingWarning}
         </div>
 
         <div class="card" style="margin-bottom:1rem">
@@ -243,11 +270,11 @@ Router.register('/craft', async (app) => {
           <table class="price-table">
             <thead><tr><th>Material</th><th>Qtd</th><th>Preço Compra (${selectedCity})</th><th>Custo Total</th></tr></thead>
             <tbody>${breakdown.map(b => `
-              <tr>
-                <td class="city" style="font-weight:600">${b.name}</td>
+              <tr style="${!b.hasData ? 'background:rgba(230,126,34,0.05)' : ''}">
+                <td class="city" style="font-weight:600">${b.name} ${!b.hasData ? '<span style="color:#e67e22;font-size:0.65rem">sem preço</span>' : ''}</td>
                 <td>${b.count * qty}x</td>
-                <td class="price">${fmt(b.buyPrice)}</td>
-                <td class="price" style="font-weight:600">${fmt(Math.round(b.lineCost))}</td>
+                <td class="price">${b.hasData ? fmt(b.buyPrice) : '<span style="color:#e67e22">—</span>'}</td>
+                <td class="price" style="font-weight:600">${b.hasData ? fmt(Math.round(b.lineCost)) : '<span style="color:#e67e22">—</span>'}</td>
               </tr>
             `).join('')}
               <tr style="border-top:2px solid var(--border)">
@@ -266,31 +293,32 @@ Router.register('/craft', async (app) => {
               const sp = allCitiesSummary[c];
               const rev = sp * qty * taxRate;
               const prof = rev - effectiveCost;
+              const isBest = sp > 0 && sp === Math.max(...Object.values(allCitiesSummary).filter(v => v > 0));
               return `<tr style="${c === selectedCity ? 'background:rgba(201,169,78,0.08)' : ''}">
-                <td class="city" style="font-weight:600">${c} ${c === selectedCity ? '⭐' : ''}</td>
-                <td class="price">${fmt(sp)}</td>
-                <td class="price">${fmt(Math.round(rev))}</td>
-                <td style="font-weight:600;color:${prof > 0 ? '#27ae60' : '#e74c3c'}">${fmt(Math.round(prof))}</td>
+                <td class="city" style="font-weight:600">${c} ${c === selectedCity ? '⭐' : ''} ${isBest && c !== selectedCity ? '<span style="color:var(--green);font-size:0.65rem">melhor</span>' : ''}</td>
+                <td class="price">${sp > 0 ? fmt(sp) : '<span style="color:var(--text-muted)">—</span>'}</td>
+                <td class="price">${sp > 0 ? fmt(Math.round(rev)) : '—'}</td>
+                <td style="font-weight:600;color:${prof > 0 ? '#27ae60' : '#e74c3c'}">${sp > 0 ? fmt(Math.round(prof)) : '—'}</td>
               </tr>`;
             }).join('')}</tbody>
           </table>
         </div>
 
         <div class="card" style="margin-bottom:1rem">
-          <div class="section-title">Comprar Materiais em (${selectedCity})</div>
+          <div class="section-title">Onde Comprar Materiais (mais barato)</div>
           <table class="price-table">
             <thead><tr><th>Material</th><th>Comprar em</th><th>Preço</th></tr></thead>
             <tbody>${breakdown.map(b => {
               const bestCity = Object.entries(b.allCityPrices).filter(([,v]) => v.buy > 0).sort((a, b) => a[1].buy - b[1].buy)[0];
               return `<tr>
                 <td class="city" style="font-weight:600">${b.name}</td>
-                <td>${bestCity ? bestCity[0] : '—'}</td>
+                <td>${bestCity ? bestCity[0] : '<span style="color:var(--text-muted)">sem dado</span>'}</td>
                 <td class="price">${bestCity ? fmt(bestCity[1].buy) : '—'}</td>
               </tr>`;
             }).join('')}</tbody>
           </table>
           <div style="font-size:0.7rem;color:var(--text-dim);margin-top:0.4rem">
-            Mostrando a cidade mais barata para comprar cada material.
+            Mostrando a cidade mais barata para comprar cada material (entre as 6 cidades principais).
           </div>
         </div>
       `;

@@ -1,7 +1,9 @@
 const API = '';
 
 function fmt(v) {
-  return Number(v || 0).toLocaleString('pt-BR');
+  if (v === 0 || v === null || v === undefined) return '—';
+  if (!isFinite(v) || isNaN(v)) return '—';
+  return Number(v).toLocaleString('pt-BR');
 }
 
 function getAuthHeaders() {
