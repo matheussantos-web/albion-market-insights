@@ -1,5 +1,9 @@
 const API = '';
 
+function fmt(v) {
+  return Number(v || 0).toLocaleString('pt-BR');
+}
+
 function getAuthHeaders() {
   const token = localStorage.getItem('auth_token');
   const headers = {};
@@ -66,4 +70,12 @@ async function getItemBases(category, search) {
 
 async function getItemVariants(base) {
   return apiGet(`/api/items/variants?base=${encodeURIComponent(base)}`);
+}
+
+async function getRecipe(uniqueName) {
+  return apiGet(`/api/craft/recipe/${encodeURIComponent(uniqueName)}`);
+}
+
+async function searchRecipes(q) {
+  return apiGet(`/api/craft/search?q=${encodeURIComponent(q)}`);
 }

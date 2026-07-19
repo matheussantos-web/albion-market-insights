@@ -9,6 +9,7 @@
     "dev": "node --watch src/server.js",
     "test": "node --test tests/test.js",
     "import:items": "node scripts/importItems.js",
+    "import:recipes": "node scripts/importRecipes.js",
     "sync:public": "node scripts/syncPublic.js",
     "db:init": "node -e \"require('./src/db/init').init()\""
   },

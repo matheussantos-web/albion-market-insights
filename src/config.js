@@ -5,6 +5,7 @@ const config = {
   dbPath: process.env.DB_PATH || './data/albion.db',
   adminSecret: process.env.ADMIN_SECRET || 'troque-isso-aqui',
   itemsJsonUrl: process.env.ITEMS_JSON_URL || 'https://raw.githubusercontent.com/ao-data/ao-bin-dumps/master/formatted/items.json',
+  itemsXmlUrl: process.env.ITEMS_XML_URL || 'https://raw.githubusercontent.com/ao-data/ao-bin-dumps/master/items.xml',
   publicSyncRegion: process.env.PUBLIC_SYNC_REGION || 'europe',
   rateLimit: {
     fetchPerMinute: Number(process.env.RATE_LIMIT_FETCH_PER_MINUTE) || 10,

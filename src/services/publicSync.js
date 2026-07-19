@@ -99,14 +99,16 @@ async function syncPublicPrices({ region = config.publicSyncRegion } = {}) {
     const url = `${base}/api/v2/stats/prices/${itemIds.join(',')}.json?locations=${CITIES.join(',')}`;
 
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, { timeout: AODP_TIMEOUT_MS });
       if (!res.ok) {
+        _aodpDownUntil = Date.now() + AODP_COOLDOWN_MS;
         console.error(`[publicSync] batch ${i / BATCH_SIZE + 1}: AODP respondeu ${res.status}`);
         continue;
       }
       const rows = await res.json();
       totalSynced += insertMany(rows);
     } catch (err) {
+      _aodpDownUntil = Date.now() + AODP_COOLDOWN_MS;
       console.error(`[publicSync] batch ${i / BATCH_SIZE + 1}: ${err.message}`);
     }
 
@@ -117,7 +119,15 @@ async function syncPublicPrices({ region = config.publicSyncRegion } = {}) {
   return { synced: totalSynced };
 }
 
+let _aodpDownUntil = 0;
+const AODP_COOLDOWN_MS = 60000;
+const AODP_TIMEOUT_MS = 8000;
+
 async function fetchItemFromAodp(itemId, { region = config.publicSyncRegion } = {}) {
+  if (Date.now() < _aodpDownUntil) {
+    throw new Error('AODP marcado como indisponível, ignorando por 60s');
+  }
+
   const base = REGIONS[region] || REGIONS.europe;
   const db = getDb();
 
@@ -125,8 +135,11 @@ async function fetchItemFromAodp(itemId, { region = config.publicSyncRegion } = 
   const insertMany = buildInsertFn(db);
 
   const url = `${base}/api/v2/stats/prices/${itemId}.json?locations=${CITIES.join(',')}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`AODP respondeu ${res.status} ${res.statusText}`);
+  const res = await fetch(url, { timeout: AODP_TIMEOUT_MS });
+  if (!res.ok) {
+    _aodpDownUntil = Date.now() + AODP_COOLDOWN_MS;
+    throw new Error(`AODP respondeu ${res.status} ${res.statusText}`);
+  }
   const rows = await res.json();
 
   return insertMany(rows);

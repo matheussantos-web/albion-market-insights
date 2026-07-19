@@ -14,6 +14,7 @@ const authRouter = require('./routes/auth');
 const newsRouter = require('./routes/news');
 const marketRouter = require('./routes/market');
 const flipperRouter = require('./routes/flipper');
+const craftRouter = require('./routes/craft');
 
 init();
 
@@ -30,6 +31,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/news', newsRouter);
 app.use('/api/market', marketRouter);
 app.use('/api/flipper', flipperRouter);
+app.use('/api/craft', craftRouter);
 
 app.use(express.static(path.join(__dirname, '..', 'public'), {
   setHeaders(res, filePath) {

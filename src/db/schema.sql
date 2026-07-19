@@ -80,3 +80,17 @@ CREATE TABLE IF NOT EXISTS sessions (
   expires_at TEXT NOT NULL,
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
+
+CREATE TABLE IF NOT EXISTS recipes (
+  item_unique_name TEXT PRIMARY KEY,
+  silver_cost      INTEGER DEFAULT 0,
+  craft_time       REAL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS recipe_resources (
+  item_unique_name     TEXT NOT NULL,
+  resource_unique_name TEXT NOT NULL,
+  count                INTEGER NOT NULL,
+  PRIMARY KEY (item_unique_name, resource_unique_name)
+);
+CREATE INDEX IF NOT EXISTS idx_recipe_res_item ON recipe_resources(item_unique_name);
+CREATE INDEX IF NOT EXISTS idx_recipe_res_res ON recipe_resources(resource_unique_name);
